@@ -34,6 +34,9 @@ Production, Preview, and Development:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
+The Vercel Supabase integration is also supported directly through
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+
 After the first deployment, add the exact Vercel callback URL to Supabase Authentication
 URL Configuration, then redeploy if the domain or environment variables changed.
 
