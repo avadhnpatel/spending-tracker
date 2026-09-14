@@ -162,17 +162,35 @@ export function TrackersPage() {
 
 function ColorRow({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {TRACKER_COLORS.map((c) => (
-        <button
-          key={c}
-          type="button"
-          onClick={() => onChange(c)}
-          className={`h-8 w-8 rounded-full ${value === c ? 'ring-2 ring-offset-2 ring-stone-900' : ''}`}
-          style={{ background: c }}
-          aria-label={c}
-        />
-      ))}
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2" aria-label="Preset tracker colors">
+        {TRACKER_COLORS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange(c)}
+            className={`h-10 w-10 rounded-full border-4 border-white ${
+              value === c ? 'ring-2 ring-stone-900' : ''
+            }`}
+            style={{ background: c }}
+            aria-label={`Use color ${c}`}
+            aria-pressed={value === c}
+          />
+        ))}
+      </div>
+      <label className="flex min-h-11 items-center justify-between rounded-2xl bg-stone-50 px-3 py-2 text-sm font-medium text-stone-700">
+        <span>Choose any color</span>
+        <span className="flex items-center gap-2 font-mono text-xs uppercase text-stone-500">
+          {value}
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-9 w-12 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+            aria-label="Open custom tracker color picker"
+          />
+        </span>
+      </label>
     </div>
   )
 }

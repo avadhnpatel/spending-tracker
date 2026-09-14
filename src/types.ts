@@ -48,11 +48,19 @@ export type Transaction = {
 
 export const TRACKER_COLORS = [
   '#0f766e',
+  '#059669',
+  '#16a34a',
+  '#65a30d',
   '#1d4ed8',
+  '#0284c7',
   '#7c3aed',
+  '#9333ea',
+  '#db2777',
   '#be123c',
+  '#dc2626',
   '#c2410c',
   '#a16207',
   '#365314',
   '#0e7490',
+  '#475569',
 ] as const
