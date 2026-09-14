@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+}
+
+body {
+  margin: 0;
+  background: #f4f1ec;
+  color: #1c1917;
+  font-family:
+    ui-rounded,
+    system-ui,
+    -apple-system,
+    'SF Pro Text',
+    sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
