@@ -219,7 +219,9 @@ export function TransactionList({
                 {(t.merchant || cat?.name || '?').charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{t.merchant || cat?.name || 'Untitled'}</p>
+                <p className="truncate font-medium">
+                  {t.merchant || cat?.name || 'Unnamed transaction'}
+                </p>
                 <p className="truncate text-xs text-stone-500">
                   {showDate ? `${formatDate(t.date)}${cat ? ' · ' : ''}` : ''}
                   {cat?.name ?? (!showDate ? 'Uncategorized' : '')}

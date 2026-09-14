@@ -1,7 +1,7 @@
 import type { Category, Transaction } from '../types'
 export function transactionsToCsv(rows: Transaction[], categories: Category[]): string {
   const byId = new Map(categories.map((c) => [c.id, c.name]))
-  const header = ['date', 'kind', 'amount', 'merchant', 'category', 'notes']
+  const header = ['date', 'kind', 'amount', 'name_or_merchant', 'category', 'notes']
   const lines = rows.map((t) =>
     [
       t.date,

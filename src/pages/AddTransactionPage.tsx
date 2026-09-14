@@ -276,12 +276,15 @@ export function AddTransactionPage() {
           </div>
         ) : null}
       </div>
-      <input
-        value={merchant}
-        onChange={(e) => setMerchant(e.target.value)}
-        placeholder="Merchant"
-        className="w-full rounded-2xl bg-white px-4 py-3 outline-none"
-      />
+      <label className="block">
+        <span className="mb-1 block text-sm text-stone-500">Name or merchant</span>
+        <input
+          value={merchant}
+          onChange={(e) => setMerchant(e.target.value)}
+          placeholder="Trader Joe’s, October rent, flight to Japan…"
+          className="w-full rounded-2xl bg-white px-4 py-3 outline-none"
+        />
+      </label>
       <input
         type="date"
         value={date}

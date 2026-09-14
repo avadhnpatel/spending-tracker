@@ -259,7 +259,7 @@ export function InsightsPage() {
           <p className="text-xs font-semibold tracking-wide text-stone-400 uppercase">Largest transaction</p>
           <div className="mt-2 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate font-semibold">{largest.merchant || 'Untitled'}</p>
+              <p className="truncate font-semibold">{largest.merchant || 'Unnamed transaction'}</p>
               <p className="text-sm text-stone-500">{formatDate(largest.date)}</p>
             </div>
             <p className="shrink-0 text-lg font-semibold">{formatMoney(largest.amount)}</p>
