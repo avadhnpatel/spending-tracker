@@ -7,8 +7,10 @@ function mapTracker(row: Tracker): Tracker {
   return row
 }
 
-function mapCategory(row: Category): Category {
-  return row
+function mapCategory(
+  row: Omit<Category, 'budget'> & { budget: string | number | null },
+): Category {
+  return { ...row, budget: row.budget == null ? null : parseAmount(row.budget) }
 }
 
 function mapRecurring(row: Omit<Recurring, 'amount'> & { amount: string | number }): Recurring {
@@ -96,6 +98,7 @@ export async function duplicateTracker(source: Tracker, userId: string): Promise
         name: c.name,
         color: c.color,
         kind: c.kind,
+        budget: c.budget,
         sort_order: c.sort_order,
       })),
     )
@@ -148,6 +151,7 @@ export async function createCategory(input: {
   name: string
   color: string
   kind: Category['kind']
+  budget?: number | null
   sortOrder: number
 }): Promise<Category> {
   const { data, error } = await requireSupabase()
@@ -157,6 +161,7 @@ export async function createCategory(input: {
       name: input.name.trim(),
       color: input.color,
       kind: input.kind,
+      budget: input.kind === 'expense' ? (input.budget ?? null) : null,
       sort_order: input.sortOrder,
     })
     .select('*')
@@ -167,7 +172,7 @@ export async function createCategory(input: {
 
 export async function updateCategory(
   id: string,
-  patch: Partial<Pick<Category, 'name' | 'color'>>,
+  patch: Partial<Pick<Category, 'name' | 'color' | 'budget'>>,
 ): Promise<void> {
   const { error } = await requireSupabase().from('categories').update(patch).eq('id', id)
   if (error) throw error

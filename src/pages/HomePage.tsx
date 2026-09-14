@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTrackers } from '../context/TrackerContext'
-import { formatMoney } from '../lib/format'
+import { formatDate, formatMoney } from '../lib/format'
 import { listCategories, listTransactions } from '../lib/queries'
 import type { Category, Transaction } from '../types'
 
@@ -43,6 +43,24 @@ export function HomePage() {
     [txns],
   )
   const net = earned - spent
+  const budgetedCategoryIds = useMemo(
+    () => new Set(categories.filter((c) => c.kind === 'expense' && c.budget !== null).map((c) => c.id)),
+    [categories],
+  )
+  const totalBudget = useMemo(
+    () =>
+      categories
+        .filter((c) => c.kind === 'expense')
+        .reduce((sum, category) => sum + (category.budget ?? 0), 0),
+    [categories],
+  )
+  const budgetedSpent = useMemo(
+    () =>
+      txns
+        .filter((t) => t.kind === 'expense' && t.category_id && budgetedCategoryIds.has(t.category_id))
+        .reduce((sum, transaction) => sum + transaction.amount, 0),
+    [budgetedCategoryIds, txns],
+  )
   const byCat = useMemo(() => {
     const map = new Map<string, number>()
     for (const t of txns) {
@@ -80,23 +98,45 @@ export function HomePage() {
 
   return (
     <div className="space-y-4 pb-4">
-      <section className="rounded-3xl bg-teal-800 p-5 text-white shadow-sm">
-        <p className="text-sm text-teal-100">Net in this tracker</p>
-        <p className="mt-1 text-4xl font-semibold tracking-tight">{formatMoney(net)}</p>
+      <section
+        className="overflow-hidden rounded-[2rem] p-5 text-white shadow-lg"
+        style={{ background: `linear-gradient(135deg, ${active.color}, #1c1917)` }}
+      >
+        <p className="text-sm text-white/70">Spent in {active.name}</p>
+        <p className="mt-1 text-4xl font-semibold tracking-tight">{formatMoney(spent)}</p>
+        {totalBudget > 0 ? (
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between text-xs text-white/75">
+              <span>{formatMoney(Math.max(totalBudget - budgetedSpent, 0))} left in budgets</span>
+              <span>{Math.round((budgetedSpent / totalBudget) * 100)}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-white transition-all"
+                style={{ width: `${Math.min((budgetedSpent / totalBudget) * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-2xl bg-white/10 p-3">
-            <p className="text-teal-100">Spent</p>
-            <p className="text-lg font-semibold">{formatMoney(spent)}</p>
+            <p className="text-white/65">Earned</p>
+            <p className="text-lg font-semibold">{formatMoney(earned)}</p>
           </div>
           <div className="rounded-2xl bg-white/10 p-3">
-            <p className="text-teal-100">Earned</p>
-            <p className="text-lg font-semibold">{formatMoney(earned)}</p>
+            <p className="text-white/65">Net</p>
+            <p className="text-lg font-semibold">{formatMoney(net)}</p>
           </div>
         </div>
       </section>
 
       <section className="rounded-3xl bg-white p-5 shadow-sm">
-        <h2 className="font-semibold">Top categories</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Top categories</h2>
+          <Link to="/more/categories" className="text-xs font-medium text-teal-800">
+            Manage budgets
+          </Link>
+        </div>
         {busy && txns.length === 0 ? (
           <p className="mt-3 text-sm text-stone-500">Loading…</p>
         ) : byCat.length === 0 ? (
@@ -104,15 +144,33 @@ export function HomePage() {
         ) : (
           <ul className="mt-3 space-y-3">
             {byCat.map(({ category, amount }) => (
-              <li key={category!.id} className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2">
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{ background: category!.color }}
-                  />
-                  {category!.name}
-                </span>
-                <span className="font-medium">{formatMoney(amount)}</span>
+              <li key={category!.id}>
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="flex items-center gap-2 font-medium">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ background: category!.color }}
+                    />
+                    {category!.name}
+                  </span>
+                  <span className="font-semibold">
+                    {formatMoney(amount)}
+                    {category!.budget !== null ? (
+                      <span className="font-normal text-stone-400"> / {formatMoney(category!.budget)}</span>
+                    ) : null}
+                  </span>
+                </div>
+                {category!.budget !== null && category!.budget > 0 ? (
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        backgroundColor: category!.color,
+                        width: `${Math.min((amount / category!.budget) * 100, 100)}%`,
+                      }}
+                    />
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -126,7 +184,9 @@ export function HomePage() {
             See all
           </Link>
         </div>
-        <TransactionList rows={txns.slice(0, 5)} categories={categories} />
+        <div className="mt-2">
+          <TransactionList rows={txns.slice(0, 5)} categories={categories} />
+        </div>
       </section>
     </div>
   )
@@ -135,30 +195,38 @@ export function HomePage() {
 export function TransactionList({
   rows,
   categories,
+  showDate = true,
 }: {
   rows: Transaction[]
   categories: Category[]
+  showDate?: boolean
 }) {
   if (rows.length === 0) {
     return <p className="mt-3 text-sm text-stone-500">Nothing logged yet.</p>
   }
   const byId = new Map(categories.map((c) => [c.id, c]))
   return (
-    <ul className="mt-3 divide-y divide-stone-100">
+    <ul className="divide-y divide-stone-100">
       {rows.map((t) => {
         const cat = t.category_id ? byId.get(t.category_id) : undefined
         return (
           <li key={t.id}>
-            <Link to={`/add/${t.id}`} className="flex items-center justify-between gap-3 py-3">
-              <div>
-                <p className="font-medium">{t.merchant || cat?.name || 'Untitled'}</p>
-                <p className="text-xs text-stone-500">
-                  {t.date}
-                  {cat ? ` · ${cat.name}` : ''}
+            <Link to={`/add/${t.id}`} className="flex min-h-16 items-center gap-3 py-3">
+              <span
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold text-white"
+                style={{ backgroundColor: cat?.color ?? '#78716c' }}
+              >
+                {(t.merchant || cat?.name || '?').charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{t.merchant || cat?.name || 'Untitled'}</p>
+                <p className="truncate text-xs text-stone-500">
+                  {showDate ? `${formatDate(t.date)}${cat ? ' · ' : ''}` : ''}
+                  {cat?.name ?? (!showDate ? 'Uncategorized' : '')}
                 </p>
               </div>
               <p
-                className={`font-semibold ${t.kind === 'income' ? 'text-teal-800' : 'text-stone-900'}`}
+                className={`shrink-0 font-semibold ${t.kind === 'income' ? 'text-emerald-700' : 'text-stone-900'}`}
               >
                 {t.kind === 'income' ? '+' : '−'}
                 {formatMoney(t.amount)}

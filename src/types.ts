@@ -17,6 +17,7 @@ export type Category = {
   name: string
   color: string
   kind: Kind
+  budget: number | null
   sort_order: number
 }
 

@@ -16,9 +16,13 @@ create table if not exists public.categories (
   name text not null,
   color text not null,
   kind text not null check (kind in ('expense', 'income')),
+  budget numeric(12, 2) check (budget >= 0),
   sort_order int not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table public.categories
+  add column if not exists budget numeric(12, 2) check (budget >= 0);
 
 create table if not exists public.recurring (
   id uuid primary key default gen_random_uuid(),

@@ -44,13 +44,15 @@ export function TrackersPage() {
 
   return (
     <div className="space-y-5 pb-6">
-      <Link to="/more" className="text-sm font-medium text-teal-800">
-        ← More
-      </Link>
-      <h1 className="text-2xl font-semibold">Trackers</h1>
-      <p className="text-sm text-stone-600">
-        Keep months, trips, and projects in separate ledgers.
-      </p>
+      <div>
+        <Link to="/more" className="text-sm font-medium text-teal-800">
+          ← More
+        </Link>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Trackers</h1>
+        <p className="mt-1 text-sm text-stone-600">
+          Keep months, trips, and projects in separate ledgers.
+        </p>
+      </div>
 
       <form onSubmit={onCreate} className="space-y-3 rounded-3xl bg-white p-4 shadow-sm">
         <p className="font-semibold">New tracker</p>
@@ -78,7 +80,11 @@ export function TrackersPage() {
 
       <ul className="space-y-2">
         {live.map((t) => (
-          <li key={t.id} className="rounded-3xl bg-white p-4 shadow-sm">
+          <li
+            key={t.id}
+            className="rounded-3xl border bg-white p-4 shadow-sm"
+            style={{ borderColor: t.id === activeId ? `${t.color}80` : 'transparent' }}
+          >
             <div className="flex items-start justify-between gap-3">
               <button type="button" className="text-left" onClick={() => setActiveId(t.id)}>
                 <p className="font-semibold">
@@ -88,7 +94,12 @@ export function TrackersPage() {
                   />
                   {t.name}
                   {t.id === activeId ? (
-                    <span className="ml-2 text-xs font-medium text-teal-800">Active</span>
+                    <span
+                      className="ml-2 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                      style={{ backgroundColor: t.color }}
+                    >
+                      Active
+                    </span>
                   ) : null}
                 </p>
                 {t.note ? <p className="mt-1 text-sm text-stone-500">{t.note}</p> : null}

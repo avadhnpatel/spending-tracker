@@ -1,11 +1,14 @@
 import { NavLink } from 'react-router-dom'
+import { useTrackers } from '../context/TrackerContext'
 
 const item = ({ isActive }: { isActive: boolean }) =>
-  `flex flex-1 flex-col items-center gap-0.5 py-1 text-[11px] font-medium ${
-    isActive ? 'text-teal-800' : 'text-stone-500'
+  `nav-item flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium ${
+    isActive ? 'is-active' : 'text-stone-500'
   }`
 
 export function BottomNav() {
+  const { active } = useTrackers()
+
   return (
     <nav
       className="fixed right-0 bottom-0 left-0 z-20 border-t border-stone-200/80 bg-[#f4f1ec]/95 backdrop-blur-md"
@@ -23,8 +26,12 @@ export function BottomNav() {
         <NavLink
           to="/add"
           className="relative -top-3 flex flex-col items-center text-[11px] font-medium text-teal-900"
+          aria-label="Add transaction"
         >
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-700 text-3xl leading-none text-white shadow-lg shadow-teal-900/20">
+          <span
+            className="flex h-14 w-14 items-center justify-center rounded-full text-3xl leading-none text-white shadow-lg transition active:scale-95"
+            style={{ backgroundColor: active?.color ?? '#0f766e', boxShadow: `0 10px 24px ${active?.color ?? '#0f766e'}40` }}
+          >
             +
           </span>
         </NavLink>

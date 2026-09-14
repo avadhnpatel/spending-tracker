@@ -9,7 +9,9 @@ body,
 
 body {
   margin: 0;
-  background: #f4f1ec;
+  background:
+    radial-gradient(circle at 15% -10%, rgb(255 255 255 / 90%), transparent 32rem),
+    #f4f1ec;
   color: #1c1917;
   font-family:
     ui-rounded,
@@ -18,6 +20,8 @@ body {
     'SF Pro Text',
     sans-serif;
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -25,4 +29,27 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button,
+a,
+select {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--tracker-color, #0f766e) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.nav-item.is-active {
+  color: var(--tracker-color, #0f766e);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--tracker-color, #0f766e) 22%, white);
 }

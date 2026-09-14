@@ -19,21 +19,27 @@ export function MorePage() {
   }
 
   return (
-    <div className="space-y-3">
-      <h1 className="text-2xl font-semibold">More</h1>
+    <div className="space-y-4 pb-4">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">More</h1>
+        <p className="mt-1 text-sm text-stone-500">Manage your tracker and data.</p>
+      </div>
       <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
-        <Row to="/more/trackers" label="Trackers" hint="Create, switch, duplicate, archive" />
-        <Row to="/more/categories" label="Categories" hint="Per tracker, with colors" />
-        <Row to="/more/recurring" label="Recurring" hint="Bills and subscriptions" />
+        <Row icon="◫" to="/more/trackers" label="Trackers" hint="Create, switch, duplicate, archive" />
+        <Row icon="◉" to="/more/categories" label="Categories & budgets" hint="Organize spending and set targets" />
+        <Row icon="↻" to="/more/recurring" label="Recurring" hint="Bills and subscriptions" />
       </div>
       <button
         type="button"
         onClick={() => void exportCsv()}
         disabled={!active}
-        className="w-full rounded-3xl bg-white px-4 py-4 text-left font-medium shadow-sm disabled:opacity-50"
+        className="flex min-h-16 w-full items-center gap-3 rounded-3xl bg-white px-4 py-4 text-left font-medium shadow-sm disabled:opacity-50"
       >
-        Export CSV
-        <p className="text-sm font-normal text-stone-500">Download this tracker’s transactions</p>
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-stone-100 text-lg">↓</span>
+        <span className="min-w-0 flex-1">
+          Export CSV
+          <span className="block text-sm font-normal text-stone-500">Download this tracker’s transactions</span>
+        </span>
       </button>
       <button
         type="button"
@@ -46,11 +52,27 @@ export function MorePage() {
   )
 }
 
-function Row({ to, label, hint }: { to: string; label: string; hint: string }) {
+function Row({
+  icon,
+  to,
+  label,
+  hint,
+}: {
+  icon: string
+  to: string
+  label: string
+  hint: string
+}) {
   return (
-    <Link to={to} className="block border-b border-stone-100 px-4 py-4 last:border-0">
-      <p className="font-medium">{label}</p>
-      <p className="text-sm text-stone-500">{hint}</p>
+    <Link to={to} className="flex min-h-16 items-center gap-3 border-b border-stone-100 px-4 py-4 last:border-0">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-stone-100 text-lg text-stone-600">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">{label}</span>
+        <span className="block text-sm text-stone-500">{hint}</span>
+      </span>
+      <span className="text-xl text-stone-300">›</span>
     </Link>
   )
 }

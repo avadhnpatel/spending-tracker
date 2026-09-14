@@ -154,8 +154,11 @@ export function AddTransactionPage() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 pb-4">
-      <h1 className="text-2xl font-semibold">{id ? 'Edit' : 'Add'} transaction</h1>
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white p-1">
+      <div>
+        <h1 className="text-3xl font-semibold tracking-tight">{id ? 'Edit' : 'Add'} transaction</h1>
+        <p className="mt-1 text-sm text-stone-500">Saving to {active.name}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-stone-200/60 p-1">
         {(['expense', 'income'] as const).map((k) => (
           <button
             key={k}
@@ -165,23 +168,28 @@ export function AddTransactionPage() {
               setCategoryId(null)
               setShowNewCategory(false)
             }}
-            className={`rounded-xl py-2.5 font-medium capitalize ${
-              kind === k ? 'bg-teal-800 text-white' : 'text-stone-600'
+            className={`min-h-11 rounded-xl font-medium capitalize transition ${
+              kind === k ? 'text-white shadow-sm' : 'text-stone-600'
             }`}
+            style={kind === k ? { backgroundColor: active.color } : undefined}
           >
             {k}
           </button>
         ))}
       </div>
-      <label className="block">
+      <label className="block rounded-3xl bg-white p-4 shadow-sm">
         <span className="mb-1 block text-sm text-stone-500">Amount</span>
-        <input
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className="w-full rounded-2xl bg-white px-4 py-4 text-3xl font-semibold outline-none"
-        />
+        <span className="flex items-center">
+          <span className="mr-1 text-3xl font-semibold text-stone-300">$</span>
+          <input
+            autoFocus={!id}
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            className="min-w-0 flex-1 bg-transparent py-2 text-4xl font-semibold tracking-tight outline-none"
+          />
+        </span>
       </label>
       <div>
         <p className="mb-2 text-sm text-stone-500">Category</p>
@@ -191,7 +199,7 @@ export function AddTransactionPage() {
               key={c.id}
               type="button"
               onClick={() => setCategoryId(c.id)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+              className={`min-h-10 rounded-full px-3 py-1.5 text-sm font-medium ${
                 categoryId === c.id ? 'text-white' : 'bg-white text-stone-700'
               }`}
               style={categoryId === c.id ? { background: c.color } : undefined}
@@ -202,7 +210,8 @@ export function AddTransactionPage() {
           <button
             type="button"
             onClick={() => setShowNewCategory((current) => !current)}
-            className="min-h-11 rounded-full border border-dashed border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-800"
+            className="min-h-11 rounded-full border border-dashed px-3 py-1.5 text-sm font-medium"
+            style={{ borderColor: active.color, color: active.color }}
             aria-expanded={showNewCategory}
           >
             + New category
@@ -308,7 +317,8 @@ export function AddTransactionPage() {
       <button
         type="submit"
         disabled={saving || compressing}
-        className="w-full rounded-2xl bg-teal-800 py-3.5 font-semibold text-white disabled:opacity-60"
+        className="w-full rounded-2xl py-3.5 font-semibold text-white shadow-lg disabled:opacity-60"
+        style={{ backgroundColor: active.color }}
       >
         {saving ? 'Saving and syncing…' : 'Save'}
       </button>
