@@ -32,7 +32,7 @@ Import this git repository as a Vite project. Add these environment variables fo
 Production, Preview, and Development:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 After the first deployment, add the exact Vercel callback URL to Supabase Authentication
 URL Configuration, then redeploy if the domain or environment variables changed.

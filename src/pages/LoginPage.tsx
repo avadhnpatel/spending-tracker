@@ -33,7 +33,8 @@ export function LoginPage() {
 
       {!configured ? (
         <div className="mt-8 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
-          Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to{' '}
+          Add <code>VITE_SUPABASE_URL</code> and{' '}
+          <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to{' '}
           <code>.env</code> (local) or Vercel env vars, then restart the app.
         </div>
       ) : (

@@ -1,12 +1,13 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const publicKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const isConfigured = Boolean(url && anonKey)
+export const isConfigured = Boolean(url && publicKey)
 
-export const supabase: SupabaseClient | null = isConfigured
-  ? createClient(url, anonKey, {
+export const supabase: SupabaseClient | null = url && publicKey
+  ? createClient(url, publicKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
