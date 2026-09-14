@@ -5,6 +5,7 @@ import { useTrackers } from '../context/TrackerContext'
 import { todayISO } from '../lib/format'
 import { compressReceipt } from '../lib/image'
 import {
+  createCategory,
   deleteTransaction,
   getTransaction,
   listCategories,
@@ -13,7 +14,7 @@ import {
   uploadReceipt,
   upsertTransaction,
 } from '../lib/queries'
-import type { Category, Kind } from '../types'
+import { TRACKER_COLORS, type Category, type Kind } from '../types'
 
 export function AddTransactionPage() {
   const { id } = useParams()
@@ -32,6 +33,10 @@ export function AddTransactionPage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [compressing, setCompressing] = useState(false)
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryColor, setNewCategoryColor] = useState<string>(TRACKER_COLORS[0])
+  const [creatingCategory, setCreatingCategory] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -111,6 +116,34 @@ export function AddTransactionPage() {
     }
   }
 
+  async function onCreateCategory() {
+    const name = newCategoryName.trim()
+    if (!active || !name) {
+      setError('Enter a category name')
+      return
+    }
+
+    setCreatingCategory(true)
+    setError(null)
+    try {
+      const category = await createCategory({
+        trackerId: active.id,
+        name,
+        color: newCategoryColor,
+        kind,
+        sortOrder: categories.length,
+      })
+      setCategories((current) => [...current, category])
+      setCategoryId(category.id)
+      setNewCategoryName('')
+      setShowNewCategory(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create category')
+    } finally {
+      setCreatingCategory(false)
+    }
+  }
+
   async function onDelete() {
     if (!id || !confirm('Delete this transaction?')) return
     await deleteTransaction(id, receiptPath)
@@ -130,6 +163,7 @@ export function AddTransactionPage() {
             onClick={() => {
               setKind(k)
               setCategoryId(null)
+              setShowNewCategory(false)
             }}
             className={`rounded-xl py-2.5 font-medium capitalize ${
               kind === k ? 'bg-teal-800 text-white' : 'text-stone-600'
@@ -165,7 +199,73 @@ export function AddTransactionPage() {
               {c.name}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setShowNewCategory((current) => !current)}
+            className="min-h-11 rounded-full border border-dashed border-teal-700 px-3 py-1.5 text-sm font-medium text-teal-800"
+            aria-expanded={showNewCategory}
+          >
+            + New category
+          </button>
         </div>
+        {showNewCategory ? (
+          <div className="mt-3 space-y-3 rounded-2xl bg-white p-3">
+            <div>
+              <label htmlFor="new-category-name" className="mb-1 block text-sm text-stone-500">
+                New {kind} category in {active.name}
+              </label>
+              <input
+                id="new-category-name"
+                autoFocus
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void onCreateCategory()
+                  }
+                }}
+                placeholder="Category name"
+                className="w-full rounded-xl bg-stone-100 px-3 py-3 outline-none"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2" aria-label="Category color">
+              {TRACKER_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setNewCategoryColor(color)}
+                  className={`h-11 w-11 rounded-full border-4 ${
+                    newCategoryColor === color ? 'border-stone-800' : 'border-white'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Use color ${color}`}
+                  aria-pressed={newCategoryColor === color}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewCategory(false)
+                  setNewCategoryName('')
+                }}
+                className="min-h-11 rounded-xl bg-stone-100 px-3 font-medium text-stone-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void onCreateCategory()}
+                disabled={creatingCategory || !newCategoryName.trim()}
+                className="min-h-11 rounded-xl bg-teal-800 px-3 font-medium text-white disabled:opacity-50"
+              >
+                {creatingCategory ? 'Creating…' : 'Create & select'}
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <input
         value={merchant}
