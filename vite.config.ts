@@ -3,8 +3,23 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const supabaseUrl =
+  process.env.VITE_SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  process.env.SUPABASE_URL ??
+  ''
+const supabasePublishableKey =
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.SUPABASE_PUBLISHABLE_KEY ??
+  ''
+
 export default defineConfig({
   envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
+  define: {
+    __SUPABASE_URL__: JSON.stringify(supabaseUrl),
+    __SUPABASE_PUBLISHABLE_KEY__: JSON.stringify(supabasePublishableKey),
+  },
   plugins: [
     react(),
     tailwindcss(),
