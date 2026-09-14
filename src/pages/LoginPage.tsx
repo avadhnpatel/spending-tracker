@@ -28,7 +28,7 @@ export function LoginPage() {
       <p className="text-sm font-semibold tracking-wide text-teal-800 uppercase">Spend</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight">Your money, in one place.</h1>
       <p className="mt-3 text-stone-600">
-        Sign in with a magic link. Same account on your iPhone and anywhere else.
+        Enter your email to sign in or create your private account. No password required.
       </p>
 
       {!configured ? (

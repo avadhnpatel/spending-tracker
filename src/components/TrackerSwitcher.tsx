@@ -18,7 +18,7 @@ export function TrackerSwitcher() {
       <select
         value={active.id}
         onChange={(e) => setActiveId(e.target.value)}
-        className="min-h-11 max-w-[70vw] appearance-none rounded-full border border-white/80 bg-white/90 py-2 pr-9 pl-8 text-base font-semibold text-stone-900 shadow-sm outline-none"
+        className="tracker-select min-h-11 max-w-[70vw] appearance-none rounded-full border border-white/80 py-2 pr-9 pl-8 text-base font-semibold text-stone-900 shadow-sm outline-none"
         style={{ backgroundImage: 'none' }}
       >
         {live.map((t) => (

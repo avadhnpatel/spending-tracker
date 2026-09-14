@@ -24,6 +24,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+.app-header {
+  background: rgb(244 241 236 / 85%);
+}
+
+.bottom-nav {
+  background: rgb(244 241 236 / 95%);
+}
+
+.tracker-select {
+  background: rgb(255 255 255 / 90%);
+}
+
 button,
 input,
 select,
@@ -52,4 +64,88 @@ textarea:focus-visible {
 
 ::selection {
   background: color-mix(in srgb, var(--tracker-color, #0f766e) 22%, white);
+}
+
+html.dark body {
+  background:
+    radial-gradient(circle at 15% -10%, rgb(41 37 36 / 85%), transparent 32rem),
+    #0c0a09;
+  color: #fafaf9;
+}
+
+html.dark .app-header {
+  background: rgb(12 10 9 / 82%);
+}
+
+html.dark .bottom-nav {
+  background: rgb(12 10 9 / 94%);
+}
+
+html.dark .tracker-select {
+  background: rgb(41 37 36 / 92%);
+  border-color: rgb(87 83 78 / 70%);
+}
+
+html.dark .bg-white {
+  background-color: #1c1917;
+}
+
+html.dark .bg-stone-50,
+html.dark .bg-stone-100 {
+  background-color: #292524;
+}
+
+html.dark .bg-stone-200,
+html.dark .bg-stone-200\/60 {
+  background-color: #44403c;
+}
+
+html.dark .text-stone-900 {
+  color: #fafaf9;
+}
+
+html.dark .text-stone-800,
+html.dark .text-stone-700 {
+  color: #e7e5e4;
+}
+
+html.dark .text-stone-600,
+html.dark .text-stone-500 {
+  color: #a8a29e;
+}
+
+html.dark .text-stone-400 {
+  color: #78716c;
+}
+
+html.dark .text-stone-300 {
+  color: #57534e;
+}
+
+html.dark .border-stone-100,
+html.dark .border-stone-200,
+html.dark .divide-stone-100 > :not(:last-child) {
+  border-color: #292524;
+}
+
+html.dark .border-white,
+html.dark .border-white\/80 {
+  border-color: #1c1917;
+}
+
+html.dark .text-teal-800 {
+  color: #5eead4;
+}
+
+html.dark .text-red-700 {
+  color: #fca5a5;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #78716c;
+}
+
+html.dark .shadow-sm {
+  box-shadow: 0 1px 0 rgb(255 255 255 / 5%), 0 8px 24px rgb(0 0 0 / 12%);
 }
