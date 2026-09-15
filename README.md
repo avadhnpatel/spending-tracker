@@ -19,6 +19,9 @@ tracker with separate transactions, categories, recurring items, receipts, and r
 4. In Supabase Authentication URL Configuration, add:
    - `http://localhost:5173/auth/callback`
    - the eventual Vercel URL ending in `/auth/callback`
+
+The browser client uses Supabase's implicit auth flow so email magic links can be opened from
+an email app or browser other than the one that requested the link.
 5. Install dependencies with `npm install`.
 6. Start development with `npm run dev`.
 
