@@ -18,7 +18,7 @@ export function CategoriesPage() {
 
   const refresh = useCallback(async () => {
     if (!active) return
-    setRows(await listCategories(active.id))
+    setRows(await listCategories(active.id, active.collection_id))
   }, [active])
 
   useEffect(() => {
@@ -38,6 +38,7 @@ export function CategoriesPage() {
     try {
       await createCategory({
         trackerId: active.id,
+        collectionId: active.collection_id,
         name,
         color,
         kind,
@@ -56,7 +57,7 @@ export function CategoriesPage() {
 
   async function onSaveEdit(e: FormEvent) {
     e.preventDefault()
-    if (!editing || !editing.name.trim()) return
+    if (!active || !editing || !editing.name.trim()) return
     setBusy(true)
     setError(null)
     try {
@@ -64,7 +65,7 @@ export function CategoriesPage() {
         name: editing.name.trim(),
         color: editing.color,
         budget: editing.kind === 'expense' ? editing.budget : null,
-      })
+      }, active.id)
       setEditing(null)
       await refresh()
     } catch (err) {

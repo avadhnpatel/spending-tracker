@@ -27,7 +27,7 @@ export function InsightsPage() {
 
   useEffect(() => {
     if (!active) return
-    Promise.all([listTransactions(active.id), listCategories(active.id)]).then(([t, c]) => {
+    Promise.all([listTransactions(active.id), listCategories(active.id, active.collection_id)]).then(([t, c]) => {
       setTxns(t)
       setCategories(c)
     })

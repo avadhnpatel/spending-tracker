@@ -31,7 +31,7 @@ export function MorePage() {
     if (!active) return
     const [txns, cats] = await Promise.all([
       listTransactions(active.id),
-      listCategories(active.id),
+      listCategories(active.id, active.collection_id),
     ])
     const slug = active.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
     downloadCsv(`${slug || 'tracker'}.csv`, transactionsToCsv(txns, cats))
@@ -70,7 +70,7 @@ export function MorePage() {
         </div>
       </section>
       <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
-        <Row icon="◫" to="/more/trackers" label="Trackers" hint="Create, switch, duplicate, archive" />
+        <Row icon="◫" to="/more/trackers" label="Collections & trackers" hint="Group months, trips, and projects" />
         <Row icon="◉" to="/more/categories" label="Categories & budgets" hint="Organize spending and set targets" />
         <Row icon="↻" to="/more/recurring" label="Recurring" hint="Bills and subscriptions" />
       </div>

@@ -1,11 +1,25 @@
 -- Run this in the Supabase SQL editor (once per project).
 
-create table if not exists public.trackers (
+create table if not exists public.tracker_collections (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
   note text not null default '',
   color text not null default '#0f766e',
+  kind text not null default 'custom' check (kind in ('monthly', 'custom')),
+  archived_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.trackers (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  collection_id uuid not null references public.tracker_collections (id) on delete cascade,
+  name text not null,
+  note text not null default '',
+  color text not null default '#0f766e',
+  period_start date,
+  period_end date,
   archived_at timestamptz,
   created_at timestamptz not null default now()
 );
@@ -13,6 +27,7 @@ create table if not exists public.trackers (
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   tracker_id uuid not null references public.trackers (id) on delete cascade,
+  collection_id uuid not null references public.tracker_collections (id) on delete cascade,
   name text not null,
   color text not null,
   kind text not null check (kind in ('expense', 'income')),
@@ -27,6 +42,7 @@ alter table public.categories
 create table if not exists public.recurring (
   id uuid primary key default gen_random_uuid(),
   tracker_id uuid not null references public.trackers (id) on delete cascade,
+  collection_id uuid not null references public.tracker_collections (id) on delete cascade,
   category_id uuid references public.categories (id) on delete set null,
   amount numeric(12, 2) not null check (amount > 0),
   kind text not null check (kind in ('expense', 'income')),
@@ -55,15 +71,37 @@ create table if not exists public.transactions (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.category_budgets (
+  tracker_id uuid not null references public.trackers (id) on delete cascade,
+  category_id uuid not null references public.categories (id) on delete cascade,
+  amount numeric(12, 2) not null check (amount >= 0),
+  primary key (tracker_id, category_id)
+);
+
+create index if not exists tracker_collections_user_id_idx on public.tracker_collections (user_id);
 create index if not exists trackers_user_id_idx on public.trackers (user_id);
+create index if not exists trackers_collection_id_idx on public.trackers (collection_id);
 create index if not exists categories_tracker_id_idx on public.categories (tracker_id);
+create index if not exists categories_collection_id_idx on public.categories (collection_id);
 create index if not exists recurring_tracker_id_idx on public.recurring (tracker_id);
+create index if not exists recurring_collection_id_idx on public.recurring (collection_id);
 create index if not exists transactions_tracker_id_date_idx on public.transactions (tracker_id, date desc);
 
+alter table public.tracker_collections enable row level security;
 alter table public.trackers enable row level security;
 alter table public.categories enable row level security;
 alter table public.recurring enable row level security;
 alter table public.transactions enable row level security;
+alter table public.category_budgets enable row level security;
+
+create policy "tracker_collections_select" on public.tracker_collections
+  for select to authenticated using (user_id = auth.uid());
+create policy "tracker_collections_insert" on public.tracker_collections
+  for insert to authenticated with check (user_id = auth.uid());
+create policy "tracker_collections_update" on public.tracker_collections
+  for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "tracker_collections_delete" on public.tracker_collections
+  for delete to authenticated using (user_id = auth.uid());
 
 create policy "trackers_select" on public.trackers
   for select to authenticated using (user_id = auth.uid());
@@ -121,6 +159,25 @@ create policy "transactions_update" on public.transactions
     exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
   );
 create policy "transactions_delete" on public.transactions
+  for delete to authenticated using (
+    exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
+  );
+
+create policy "category_budgets_select" on public.category_budgets
+  for select to authenticated using (
+    exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
+  );
+create policy "category_budgets_insert" on public.category_budgets
+  for insert to authenticated with check (
+    exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
+  );
+create policy "category_budgets_update" on public.category_budgets
+  for update to authenticated using (
+    exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
+  ) with check (
+    exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
+  );
+create policy "category_budgets_delete" on public.category_budgets
   for delete to authenticated using (
     exists (select 1 from public.trackers t where t.id = tracker_id and t.user_id = auth.uid())
   );

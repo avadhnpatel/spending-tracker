@@ -1,19 +1,12 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
-import {
-  createTracker as createTrackerRow,
-  duplicateTracker as duplicateTrackerRow,
+  createCollection as createCollectionRow,
+  createTrackerInCollection,
+  listCollections,
   listTrackers,
   updateTracker,
 } from '../lib/queries'
-import type { Tracker } from '../types'
+import type { CollectionKind, Tracker, TrackerCollection } from '../types'
 import { useAuth } from './AuthContext'
 
 const STORAGE_KEY = 'spend.activeTrackerId'
@@ -21,15 +14,18 @@ const STORAGE_KEY = 'spend.activeTrackerId'
 type TrackerContextValue = {
   loading: boolean
   error: string | null
+  collections: TrackerCollection[]
   trackers: Tracker[]
+  activeCollection: TrackerCollection | null
   active: Tracker | null
   activeId: string | null
   setActiveId: (id: string) => void
+  setActiveCollectionId: (id: string) => void
   refresh: () => Promise<void>
-  createTracker: (input: { name: string; note?: string; color: string }) => Promise<Tracker>
+  createCollection: (input: { name: string; note?: string; color: string; kind: CollectionKind; month?: string; trackerName?: string }) => Promise<Tracker>
+  createTracker: (input: { collectionId: string; name?: string; note?: string; month?: string; copyBudgetsFrom?: string }) => Promise<Tracker>
   renameTracker: (id: string, name: string, note: string, color: string) => Promise<void>
   archiveTracker: (id: string, archived: boolean) => Promise<void>
-  duplicateTracker: (id: string) => Promise<Tracker>
 }
 
 const TrackerContext = createContext<TrackerContextValue | null>(null)
@@ -38,13 +34,13 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [collections, setCollections] = useState<TrackerCollection[]>([])
   const [trackers, setTrackers] = useState<Tracker[]>([])
-  const [activeId, setActiveIdState] = useState<string | null>(() =>
-    localStorage.getItem(STORAGE_KEY),
-  )
+  const [activeId, setActiveIdState] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY))
 
   const refresh = useCallback(async () => {
     if (!user) {
+      setCollections([])
       setTrackers([])
       setLoading(false)
       return
@@ -52,8 +48,9 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     try {
-      const rows = await listTrackers(user.id)
-      setTrackers(rows)
+      const [collectionRows, trackerRows] = await Promise.all([listCollections(user.id), listTrackers(user.id)])
+      setCollections(collectionRows)
+      setTrackers(trackerRows)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load trackers')
     } finally {
@@ -65,15 +62,12 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
-  const activeTrackers = useMemo(
-    () => trackers.filter((t) => !t.archived_at),
-    [trackers],
+  const liveTrackers = useMemo(() => trackers.filter((tracker) => !tracker.archived_at), [trackers])
+  const active = useMemo(() => liveTrackers.find((tracker) => tracker.id === activeId) ?? liveTrackers[0] ?? null, [activeId, liveTrackers])
+  const activeCollection = useMemo(
+    () => collections.find((collection) => collection.id === active?.collection_id) ?? null,
+    [active, collections],
   )
-
-  const active = useMemo(() => {
-    const fromId = trackers.find((t) => t.id === activeId && !t.archived_at)
-    return fromId ?? activeTrackers[0] ?? null
-  }, [activeId, activeTrackers, trackers])
 
   useEffect(() => {
     if (active && active.id !== activeId) {
@@ -82,53 +76,58 @@ export function TrackerProvider({ children }: { children: ReactNode }) {
     }
   }, [active, activeId])
 
-  const setActiveId = (id: string) => {
+  const setActiveId = useCallback((id: string) => {
     setActiveIdState(id)
     localStorage.setItem(STORAGE_KEY, id)
-  }
+  }, [])
 
-  const value = useMemo<TrackerContextValue>(
-    () => ({
-      loading,
-      error,
-      trackers,
-      active,
-      activeId: active?.id ?? null,
-      setActiveId,
-      refresh,
-      createTracker: async (input) => {
-        if (!user) throw new Error('Not signed in')
-        const row = await createTrackerRow({ userId: user.id, ...input })
-        await refresh()
-        setActiveId(row.id)
-        return row
-      },
-      renameTracker: async (id, name, note, color) => {
-        await updateTracker(id, { name, note, color })
-        await refresh()
-      },
-      archiveTracker: async (id, archived) => {
-        await updateTracker(id, { archived_at: archived ? new Date().toISOString() : null })
-        await refresh()
-      },
-      duplicateTracker: async (id) => {
-        if (!user) throw new Error('Not signed in')
-        const source = trackers.find((t) => t.id === id)
-        if (!source) throw new Error('Tracker not found')
-        const copy = await duplicateTrackerRow(source, user.id)
-        await refresh()
-        setActiveId(copy.id)
-        return copy
-      },
-    }),
-    [active, loading, error, refresh, trackers, user],
-  )
+  const setActiveCollectionId = useCallback((id: string) => {
+    const tracker = liveTrackers.find((row) => row.collection_id === id)
+    if (tracker) setActiveId(tracker.id)
+  }, [liveTrackers, setActiveId])
+
+  const value = useMemo<TrackerContextValue>(() => ({
+    loading,
+    error,
+    collections,
+    trackers,
+    activeCollection,
+    active,
+    activeId: active?.id ?? null,
+    setActiveId,
+    setActiveCollectionId,
+    refresh,
+    createCollection: async (input) => {
+      if (!user) throw new Error('Not signed in')
+      const result = await createCollectionRow({ userId: user.id, ...input })
+      await refresh()
+      setActiveId(result.tracker.id)
+      return result.tracker
+    },
+    createTracker: async (input) => {
+      if (!user) throw new Error('Not signed in')
+      const collection = collections.find((row) => row.id === input.collectionId)
+      if (!collection) throw new Error('Collection not found')
+      const tracker = await createTrackerInCollection({ userId: user.id, collection, ...input })
+      await refresh()
+      setActiveId(tracker.id)
+      return tracker
+    },
+    renameTracker: async (id, name, note, color) => {
+      await updateTracker(id, { name, note, color })
+      await refresh()
+    },
+    archiveTracker: async (id, archived) => {
+      await updateTracker(id, { archived_at: archived ? new Date().toISOString() : null })
+      await refresh()
+    },
+  }), [active, activeCollection, collections, error, loading, refresh, setActiveCollectionId, setActiveId, trackers, user])
 
   return <TrackerContext.Provider value={value}>{children}</TrackerContext.Provider>
 }
 
 export function useTrackers(): TrackerContextValue {
-  const ctx = useContext(TrackerContext)
-  if (!ctx) throw new Error('useTrackers must be used within TrackerProvider')
-  return ctx
+  const context = useContext(TrackerContext)
+  if (!context) throw new Error('useTrackers must be used within TrackerProvider')
+  return context
 }

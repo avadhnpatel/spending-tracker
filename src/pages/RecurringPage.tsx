@@ -12,7 +12,7 @@ import {
 import type { Cadence, Category, Kind, Recurring } from '../types'
 
 export function RecurringPage() {
-  const { active } = useTrackers()
+  const { active, activeCollection, trackers } = useTrackers()
   const [rows, setRows] = useState<Recurring[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -27,14 +27,14 @@ export function RecurringPage() {
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    if (!active) return
+    if (!active || !activeCollection) return
     const [recurring, categoryRows] = await Promise.all([
-      listRecurring(active.id),
-      listCategories(active.id),
+      listRecurring(activeCollection.id),
+      listCategories(active.id, active.collection_id),
     ])
     setRows(recurring)
     setCategories(categoryRows)
-  }, [active])
+  }, [active, activeCollection])
 
   useEffect(() => {
     void refresh()
@@ -67,7 +67,7 @@ export function RecurringPage() {
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
-    if (!active) return
+    if (!active || !activeCollection) return
     const parsedAmount = Number.parseFloat(amount)
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError('Enter an amount greater than 0')
@@ -84,6 +84,7 @@ export function RecurringPage() {
       await upsertRecurring({
         id: editingId ?? undefined,
         tracker_id: active.id,
+        collection_id: activeCollection.id,
         category_id: categoryId,
         amount: parsedAmount,
         kind,
@@ -103,12 +104,23 @@ export function RecurringPage() {
   }
 
   async function markPaid(row: Recurring) {
-    if (!active || !row.active) return
+    if (!active || !activeCollection || !row.active) return
+    const targetTracker = activeCollection.kind === 'monthly'
+      ? trackers.find((tracker) =>
+          tracker.collection_id === activeCollection.id &&
+          tracker.period_start && tracker.period_end &&
+          row.next_due_date >= tracker.period_start && row.next_due_date <= tracker.period_end,
+        )
+      : active
+    if (!targetTracker) {
+      setError(`Create the ${formatDate(row.next_due_date)} monthly tracker before marking this paid.`)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       await upsertTransaction({
-        tracker_id: active.id,
+        tracker_id: targetTracker.id,
         category_id: row.category_id,
         recurring_id: row.id,
         amount: row.amount,
@@ -132,7 +144,21 @@ export function RecurringPage() {
     }
   }
 
-  if (!active) return <p className="py-8 text-stone-500">Create a tracker first.</p>
+  if (!active || !activeCollection) return <p className="py-8 text-stone-500">Create a tracker first.</p>
+
+  if (activeCollection.kind !== 'monthly') {
+    return (
+      <div className="space-y-4 pb-6">
+        <Link to="/more" className="text-sm font-medium text-teal-800">← More</Link>
+        <div className="rounded-3xl bg-white p-6 shadow-sm">
+          <h1 className="text-2xl font-semibold">Recurring is for monthly collections</h1>
+          <p className="mt-2 text-stone-500">
+            Switch to a monthly collection to manage bills and repeating income across its months.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const matchingCategories = categories.filter((category) => category.kind === kind)
   const orderedRows = [...rows].sort(

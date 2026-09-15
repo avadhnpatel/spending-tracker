@@ -19,7 +19,7 @@ export function ActivityPage() {
   useEffect(() => {
     if (!active) return
     let cancelled = false
-    Promise.all([listTransactions(active.id), listCategories(active.id)]).then(([t, c]) => {
+    Promise.all([listTransactions(active.id), listCategories(active.id, active.collection_id)]).then(([t, c]) => {
       if (!cancelled) {
         setTxns(t)
         setCategories(c)

@@ -41,7 +41,7 @@ export function AddTransactionPage() {
 
   useEffect(() => {
     if (!active) return
-    listCategories(active.id).then(setCategories)
+    listCategories(active.id, active.collection_id).then(setCategories)
   }, [active])
 
   useEffect(() => {
@@ -128,6 +128,7 @@ export function AddTransactionPage() {
     try {
       const category = await createCategory({
         trackerId: active.id,
+        collectionId: active.collection_id,
         name,
         color: newCategoryColor,
         kind,

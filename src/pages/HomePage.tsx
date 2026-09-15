@@ -19,7 +19,7 @@ export function HomePage() {
     }
     let cancelled = false
     setBusy(true)
-    Promise.all([listTransactions(active.id), listCategories(active.id)])
+    Promise.all([listTransactions(active.id), listCategories(active.id, active.collection_id)])
       .then(([t, c]) => {
         if (!cancelled) {
           setTxns(t)
@@ -82,7 +82,7 @@ export function HomePage() {
   if (!active) {
     return (
       <div className="mt-10 rounded-3xl bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Start a tracker</h1>
+        <h1 className="text-2xl font-semibold">Start a collection</h1>
         <p className="mt-2 text-stone-600">
           Separate ledgers for a month, a trip, or a move. Totals stay in their own tracker.
         </p>
@@ -90,7 +90,7 @@ export function HomePage() {
           to="/more/trackers"
           className="mt-5 inline-flex rounded-2xl bg-teal-800 px-5 py-3 font-semibold text-white"
         >
-          Create your first tracker
+          Create your first collection
         </Link>
       </div>
     )

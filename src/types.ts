@@ -1,12 +1,27 @@
 export type Kind = 'expense' | 'income'
 export type Cadence = 'weekly' | 'monthly' | 'yearly'
+export type CollectionKind = 'monthly' | 'custom'
 
-export type Tracker = {
+export type TrackerCollection = {
   id: string
   user_id: string
   name: string
   note: string
   color: string
+  kind: CollectionKind
+  archived_at: string | null
+  created_at: string
+}
+
+export type Tracker = {
+  id: string
+  user_id: string
+  collection_id: string
+  name: string
+  note: string
+  color: string
+  period_start: string | null
+  period_end: string | null
   archived_at: string | null
   created_at: string
 }
@@ -14,6 +29,7 @@ export type Tracker = {
 export type Category = {
   id: string
   tracker_id: string
+  collection_id: string
   name: string
   color: string
   kind: Kind
@@ -24,6 +40,7 @@ export type Category = {
 export type Recurring = {
   id: string
   tracker_id: string
+  collection_id: string
   category_id: string | null
   amount: number
   kind: Kind
