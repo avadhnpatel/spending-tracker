@@ -13,8 +13,13 @@ function mapCategory(
   return { ...row, budget: row.budget == null ? null : parseAmount(row.budget) }
 }
 
-function mapRecurring(row: Omit<Recurring, 'amount'> & { amount: string | number }): Recurring {
-  return { ...row, amount: parseAmount(row.amount) }
+function mapRecurring(
+  row: Omit<Recurring, 'amount' | 'end_date'> & {
+    amount: string | number
+    end_date?: string | null
+  },
+): Recurring {
+  return { ...row, amount: parseAmount(row.amount), end_date: row.end_date ?? null }
 }
 
 function mapTransaction(
@@ -127,6 +132,7 @@ export async function duplicateTracker(source: Tracker, userId: string): Promise
         merchant: r.merchant,
         cadence: r.cadence,
         next_due_date: r.next_due_date,
+        end_date: r.end_date,
         active: r.active,
       })),
     )
@@ -287,6 +293,7 @@ export async function upsertRecurring(
     merchant: input.merchant,
     cadence: input.cadence,
     next_due_date: input.next_due_date,
+    end_date: input.end_date,
     active: input.active,
   }
   if (input.id) {

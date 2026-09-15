@@ -33,9 +33,13 @@ create table if not exists public.recurring (
   merchant text not null default '',
   cadence text not null check (cadence in ('weekly', 'monthly', 'yearly')),
   next_due_date date not null,
+  end_date date,
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+alter table public.recurring
+  add column if not exists end_date date;
 
 create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),

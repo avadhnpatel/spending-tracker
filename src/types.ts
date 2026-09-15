@@ -30,6 +30,7 @@ export type Recurring = {
   merchant: string
   cadence: Cadence
   next_due_date: string
+  end_date: string | null
   active: boolean
 }
 

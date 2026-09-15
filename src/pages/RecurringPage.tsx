@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useTrackers } from '../context/TrackerContext'
-import { advanceDate, formatMoney, todayISO } from '../lib/format'
+import { advanceDate, formatDate, formatMoney, todayISO } from '../lib/format'
 import {
   deleteRecurring,
   listCategories,
@@ -15,164 +15,306 @@ export function RecurringPage() {
   const { active } = useTrackers()
   const [rows, setRows] = useState<Recurring[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [merchant, setMerchant] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
   const [kind, setKind] = useState<Kind>('expense')
   const [cadence, setCadence] = useState<Cadence>('monthly')
   const [due, setDue] = useState(todayISO())
+  const [endDate, setEndDate] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!active) return
-    const [r, c] = await Promise.all([listRecurring(active.id), listCategories(active.id)])
-    setRows(r)
-    setCategories(c)
+    const [recurring, categoryRows] = await Promise.all([
+      listRecurring(active.id),
+      listCategories(active.id),
+    ])
+    setRows(recurring)
+    setCategories(categoryRows)
   }, [active])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  async function onCreate(e: FormEvent) {
+  function resetForm() {
+    setEditingId(null)
+    setName('')
+    setAmount('')
+    setKind('expense')
+    setCadence('monthly')
+    setDue(todayISO())
+    setEndDate('')
+    setCategoryId(null)
+    setError(null)
+  }
+
+  function editRecurring(row: Recurring) {
+    setEditingId(row.id)
+    setName(row.merchant)
+    setAmount(String(row.amount))
+    setKind(row.kind)
+    setCadence(row.cadence)
+    setDue(row.next_due_date)
+    setEndDate(row.end_date ?? '')
+    setCategoryId(row.category_id)
+    setError(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function onSave(e: FormEvent) {
     e.preventDefault()
     if (!active) return
-    const n = Number.parseFloat(amount)
-    if (!Number.isFinite(n) || n <= 0) return
-    await upsertRecurring({
-      tracker_id: active.id,
-      category_id: categoryId,
-      amount: n,
-      kind,
-      merchant: merchant.trim(),
-      cadence,
-      next_due_date: due,
-      active: true,
-    })
-    setMerchant('')
-    setAmount('')
-    await refresh()
+    const parsedAmount = Number.parseFloat(amount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setError('Enter an amount greater than 0')
+      return
+    }
+    if (endDate && endDate < due) {
+      setError('End date must be on or after the next due date')
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+    try {
+      await upsertRecurring({
+        id: editingId ?? undefined,
+        tracker_id: active.id,
+        category_id: categoryId,
+        amount: parsedAmount,
+        kind,
+        merchant: name.trim(),
+        cadence,
+        next_due_date: due,
+        end_date: endDate || null,
+        active: true,
+      })
+      resetForm()
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save recurring item')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function markPaid(row: Recurring) {
-    if (!active) return
-    await upsertTransaction({
-      tracker_id: active.id,
-      category_id: row.category_id,
-      recurring_id: row.id,
-      amount: row.amount,
-      kind: row.kind,
-      date: row.next_due_date,
-      merchant: row.merchant,
-      notes: `Recurring (${row.cadence})`,
-      receipt_path: null,
-    })
-    await upsertRecurring({
-      ...row,
-      next_due_date: advanceDate(row.next_due_date, row.cadence),
-    })
-    await refresh()
+    if (!active || !row.active) return
+    setBusy(true)
+    setError(null)
+    try {
+      await upsertTransaction({
+        tracker_id: active.id,
+        category_id: row.category_id,
+        recurring_id: row.id,
+        amount: row.amount,
+        kind: row.kind,
+        date: row.next_due_date,
+        merchant: row.merchant,
+        notes: `Recurring (${row.cadence})`,
+        receipt_path: null,
+      })
+      const nextDueDate = advanceDate(row.next_due_date, row.cadence)
+      await upsertRecurring({
+        ...row,
+        next_due_date: nextDueDate,
+        active: !row.end_date || nextDueDate <= row.end_date,
+      })
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not mark this item paid')
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (!active) return <p className="py-8 text-stone-500">Create a tracker first.</p>
 
-  const cats = categories.filter((c) => c.kind === kind)
+  const matchingCategories = categories.filter((category) => category.kind === kind)
+  const orderedRows = [...rows].sort(
+    (left, right) => Number(right.active) - Number(left.active) || left.next_due_date.localeCompare(right.next_due_date),
+  )
 
   return (
-    <div className="space-y-4 pb-6">
-      <Link to="/more" className="text-sm font-medium text-teal-800">
-        ← More
-      </Link>
-      <h1 className="text-2xl font-semibold">Recurring</h1>
+    <div className="space-y-5 pb-6">
+      <div>
+        <Link to="/more" className="text-sm font-medium text-teal-800">
+          ← More
+        </Link>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Recurring</h1>
+        <p className="mt-1 text-sm text-stone-500">Keep bills and repeating income on schedule.</p>
+      </div>
 
-      <form onSubmit={onCreate} className="space-y-3 rounded-3xl bg-white p-4 shadow-sm">
-        <input
-          value={merchant}
-          onChange={(e) => setMerchant(e.target.value)}
-          placeholder="Name (Netflix, rent…)"
-          className="w-full rounded-2xl bg-stone-50 px-4 py-3 outline-none"
-        />
-        <input
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Amount"
-          className="w-full rounded-2xl bg-stone-50 px-4 py-3 outline-none"
-        />
-        <div className="grid grid-cols-2 gap-2">
-          {(['expense', 'income'] as const).map((k) => (
+      <form onSubmit={onSave} className="space-y-4 rounded-3xl bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between">
+          <p className="font-semibold">{editingId ? 'Edit recurring item' : 'New recurring item'}</p>
+          {editingId ? (
+            <button type="button" onClick={resetForm} className="min-h-10 text-sm font-medium text-stone-500">
+              Cancel
+            </button>
+          ) : null}
+        </div>
+        <label className="block">
+          <span className="mb-1 block text-sm text-stone-500">Name</span>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Netflix, rent, paycheck…"
+            className="w-full rounded-2xl bg-stone-50 px-4 py-3 outline-none"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm text-stone-500">Amount</span>
+          <div className="flex items-center rounded-2xl bg-stone-50 px-4">
+            <span className="text-stone-400">$</span>
+            <input
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              className="min-w-0 flex-1 bg-transparent px-2 py-3 outline-none"
+            />
+          </div>
+        </label>
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-stone-100 p-1">
+          {(['expense', 'income'] as const).map((choice) => (
             <button
-              key={k}
+              key={choice}
               type="button"
-              onClick={() => setKind(k)}
-              className={`rounded-xl py-2 capitalize ${kind === k ? 'bg-teal-800 text-white' : 'bg-stone-50'}`}
+              onClick={() => {
+                setKind(choice)
+                setCategoryId(null)
+              }}
+              className={`min-h-11 rounded-xl font-medium capitalize transition ${
+                kind === choice ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'
+              }`}
             >
-              {k}
+              {choice}
             </button>
           ))}
         </div>
-        <select
-          value={cadence}
-          onChange={(e) => setCadence(e.target.value as Cadence)}
-          className="w-full rounded-2xl bg-stone-50 px-4 py-3"
+        <label className="block">
+          <span className="mb-1 block text-sm text-stone-500">Repeats</span>
+          <select
+            value={cadence}
+            onChange={(e) => setCadence(e.target.value as Cadence)}
+            className="w-full rounded-2xl bg-stone-50 px-4 py-3 outline-none"
+          >
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-sm text-stone-500">
+            Next due
+            <input
+              type="date"
+              required
+              value={due}
+              onChange={(e) => setDue(e.target.value)}
+              className="mt-1 w-full rounded-2xl bg-stone-50 px-3 py-3 text-sm text-stone-800 outline-none"
+            />
+          </label>
+          <label className="text-sm text-stone-500">
+            End date <span className="text-stone-400">(optional)</span>
+            <input
+              type="date"
+              value={endDate}
+              min={due}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="mt-1 w-full rounded-2xl bg-stone-50 px-3 py-3 text-sm text-stone-800 outline-none"
+            />
+          </label>
+        </div>
+        <label className="block">
+          <span className="mb-1 block text-sm text-stone-500">Category</span>
+          <select
+            value={categoryId ?? ''}
+            onChange={(e) => setCategoryId(e.target.value || null)}
+            className="w-full rounded-2xl bg-stone-50 px-4 py-3 outline-none"
+          >
+            <option value="">No category</option>
+            {matchingCategories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+        <button
+          type="submit"
+          disabled={busy}
+          className="w-full rounded-2xl py-3 font-semibold text-white disabled:opacity-50"
+          style={{ backgroundColor: active.color }}
         >
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="yearly">Yearly</option>
-        </select>
-        <input
-          type="date"
-          value={due}
-          onChange={(e) => setDue(e.target.value)}
-          className="w-full rounded-2xl bg-stone-50 px-4 py-3"
-        />
-        <select
-          value={categoryId ?? ''}
-          onChange={(e) => setCategoryId(e.target.value || null)}
-          className="w-full rounded-2xl bg-stone-50 px-4 py-3"
-        >
-          <option value="">No category</option>
-          {cats.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className="w-full rounded-2xl bg-teal-800 py-3 font-semibold text-white">
-          Add recurring
+          {busy ? 'Saving…' : editingId ? 'Save changes' : 'Add recurring item'}
         </button>
       </form>
 
-      <ul className="space-y-2">
-        {rows.map((r) => (
-          <li key={r.id} className="rounded-3xl bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-semibold">{r.merchant || 'Untitled'}</p>
-                <p className="text-sm text-stone-500">
-                  {formatMoney(r.amount)} · {r.cadence} · next {r.next_due_date}
-                </p>
+      {orderedRows.length === 0 ? (
+        <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
+          <p className="font-medium">No recurring items yet</p>
+          <p className="mt-1 text-sm text-stone-500">Add a bill, subscription, or repeating income above.</p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {orderedRows.map((row) => (
+            <li key={row.id} className={`rounded-3xl bg-white p-4 shadow-sm ${row.active ? '' : 'opacity-65'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{row.merchant || 'Unnamed recurring item'}</p>
+                  <p className="mt-0.5 text-sm text-stone-500">
+                    {formatMoney(row.amount)} · {row.cadence}
+                  </p>
+                  <p className="mt-1 text-xs text-stone-400">
+                    {row.active ? `Next ${formatDate(row.next_due_date)}` : 'Completed'}
+                    {row.end_date ? ` · Ends ${formatDate(row.end_date)}` : ' · No end date'}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-1 text-xs font-medium ${
+                    row.active ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                  }`}
+                >
+                  {row.active ? row.kind : 'Ended'}
+                </span>
               </div>
-              <p className="text-xs text-stone-400">{r.kind}</p>
-            </div>
-            <div className="mt-3 flex gap-4 text-sm font-medium">
-              <button type="button" className="text-teal-800" onClick={() => void markPaid(r)}>
-                Mark paid
-              </button>
-              <button
-                type="button"
-                className="text-red-700"
-                onClick={async () => {
-                  if (!confirm('Delete this recurring item?')) return
-                  await deleteRecurring(r.id)
-                  await refresh()
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+              <div className="mt-3 flex flex-wrap gap-4 text-sm font-medium">
+                {row.active ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="min-h-10 text-teal-800 disabled:opacity-50"
+                    onClick={() => void markPaid(row)}
+                  >
+                    Mark paid
+                  </button>
+                ) : null}
+                <button type="button" className="min-h-10 text-teal-800" onClick={() => editRecurring(row)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="min-h-10 text-red-700"
+                  onClick={async () => {
+                    if (!confirm('Delete this recurring item?')) return
+                    await deleteRecurring(row.id)
+                    await refresh()
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
