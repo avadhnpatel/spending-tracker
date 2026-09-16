@@ -13,6 +13,8 @@ type SetupSession = {
   expiresAt: string
 }
 
+type SupabaseOrganization = { id: string; slug: string; name: string }
+
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }
   if (!response.ok) throw new Error(body.error || 'Setup request failed')
@@ -23,6 +25,9 @@ export function SetupPage() {
   const [session, setSession] = useState<SetupSession | null>(null)
   const [repositoryName, setRepositoryName] = useState('spend-private')
   const [busy, setBusy] = useState(false)
+  const [organizations, setOrganizations] = useState<SupabaseOrganization[]>([])
+  const [organizationSlug, setOrganizationSlug] = useState('')
+  const [projectName, setProjectName] = useState('spend-private')
   const [error, setError] = useState<string | null>(() => new URLSearchParams(location.search).get('error'))
 
   useEffect(() => {
@@ -43,6 +48,21 @@ export function SetupPage() {
     return Number(session.connections.github) + Number(Boolean(session.repository)) + Number(session.connections.supabase) + Number(session.connections.vercel)
   }, [session])
 
+  useEffect(() => {
+    if (completed !== 4 || session?.status === 'complete') return
+    async function loadOptions() {
+      try {
+        const result = await readJson<{ organizations: SupabaseOrganization[] }>(await fetch('/api/setup/options'))
+        setOrganizations(result.organizations)
+        setOrganizationSlug((current) => current || result.organizations[0]?.slug || '')
+        if (session?.repository) setProjectName(session.repository.split('/')[1] || 'spend-private')
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Could not load Supabase organizations')
+      }
+    }
+    void loadOptions()
+  }, [completed, session?.repository, session?.status])
+
   async function createRepository() {
     setBusy(true)
     setError(null)
@@ -56,6 +76,28 @@ export function SetupPage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create the repository')
     } finally {
+      setBusy(false)
+    }
+  }
+
+  async function provision() {
+    setBusy(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/setup/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationSlug, projectName }),
+      })
+      const next = await readJson<SetupSession>(response)
+      setSession(next)
+      if (response.status === 202) {
+        window.setTimeout(() => void provision(), next.status === 'configuring_supabase' ? 15000 : 4000)
+        return
+      }
+      setBusy(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Provisioning could not continue')
       setBusy(false)
     }
   }
@@ -107,10 +149,29 @@ export function SetupPage() {
             {session.connections.vercel ? <Status text="Vercel connected" /> : <ConnectButton href="/api/setup/oauth/vercel/start" label="Connect Vercel" disabled={!session.connections.supabase} />}
           </SetupStep>
 
-          {completed === 4 ? (
+          {completed === 4 && session.status !== 'complete' ? (
             <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
-              <p className="font-semibold text-teal-950">All accounts are connected.</p>
-              <p className="mt-1 text-sm leading-6 text-teal-900">Automatic project creation and deployment is the next provisioning stage. Your connections are ready for it.</p>
+              <p className="font-semibold text-teal-950">Create your private Spend app</p>
+              <p className="mt-1 text-sm leading-6 text-teal-900">Choose where the private database should live. Setup usually takes two to four minutes and can be retried safely.</p>
+              <div className="mt-4 space-y-3">
+                <label className="block text-sm font-semibold text-teal-950">Supabase organization
+                  <select value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">
+                    {organizations.map((organization) => <option key={organization.id} value={organization.slug}>{organization.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-sm font-semibold text-teal-950">Project name
+                  <input value={projectName} onChange={(event) => setProjectName(event.target.value)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60" />
+                </label>
+                <button type="button" onClick={() => void provision()} disabled={busy || !organizationSlug} className="min-h-12 w-full rounded-xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-50">{busy ? setupStatusLabel(session.status) : session.supabaseProjectRef ? 'Resume setup' : 'Create my private app'}</button>
+              </div>
+            </section>
+          ) : null}
+
+          {session.status === 'complete' && session.deploymentUrl ? (
+            <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
+              <p className="font-semibold text-teal-950">Your private Spend app is ready.</p>
+              <p className="mt-1 text-sm leading-6 text-teal-900">The temporary provider tokens have been removed from the installer.</p>
+              <a href={session.deploymentUrl} className="mt-4 inline-flex min-h-12 items-center rounded-xl bg-teal-800 px-5 font-semibold text-white">Open my Spend app →</a>
             </section>
           ) : null}
         </div>
@@ -119,6 +180,13 @@ export function SetupPage() {
       <p className="mt-7 text-center text-xs leading-5 text-stone-500">Your financial data stays in the Supabase project you own. Plaid is connected later inside your deployed Spend app.</p>
     </main>
   )
+}
+
+function setupStatusLabel(status: string): string {
+  if (status === 'creating_supabase') return 'Creating Supabase project…'
+  if (status === 'configuring_supabase') return 'Configuring database…'
+  if (status === 'deploying') return 'Deploying to Vercel…'
+  return 'Working…'
 }
 
 function SetupStep({ number, title, description, done, locked = false, children }: { number: string; title: string; description: string; done: boolean; locked?: boolean; children: React.ReactNode }) {

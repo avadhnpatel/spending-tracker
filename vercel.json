@@ -1,3 +1,9 @@
 {
+  "functions": {
+    "api/setup/provision.ts": {
+      "includeFiles": ["supabase/schema.sql", "supabase/functions/**"],
+      "maxDuration": 60
+    }
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

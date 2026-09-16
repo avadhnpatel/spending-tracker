@@ -114,3 +114,7 @@ uses matching provider callback URLs. Redeploy after adding them.
   Supabase project. The installer does not receive them.
 - Successful provisioning must delete OAuth tokens. Failed and abandoned rows
   are removed by the expiry cleanup.
+
+## Test the completed installer
+
+After all environment variables are saved and the latest `main` deployment is ready, open `/setup` in a private browser window. Connect the three services, create a test repository, choose a Supabase organization, and press **Create my private app**. The flow is restartable: if a newly created Supabase project is still booting, wait about a minute and press **Resume setup**. A successful run ends with a link to the new Vercel app and removes the temporary provider tokens from the provisioning database.
