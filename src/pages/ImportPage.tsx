@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTrackers } from '../context/TrackerContext'
 import { parseCsvStatement, type CsvParseResult } from '../lib/csv'
+import { filterCardCandidates, listActiveTrackers, suggestCardCategory } from '../lib/card-activity'
 import { formatDate, formatMoney } from '../lib/format'
 import { connectPlaid, resumePlaidRedirect, syncPlaid } from '../lib/plaid'
 import {
@@ -42,11 +43,10 @@ export function ImportPage() {
   const liveCollections = collections.filter((collection) => !collection.archived_at)
   const selectedCollection = liveCollections.find((collection) => collection.id === collectionId) ?? liveCollections[0] ?? null
   const collectionTrackers = trackers.filter((tracker) => tracker.collection_id === selectedCollection?.id && !tracker.archived_at)
-  const activeTrackers = trackers.filter((tracker) => !tracker.archived_at && liveCollections.some((collection) => collection.id === tracker.collection_id))
+  const activeTrackers = listActiveTrackers(trackers, collections)
   const plaidCandidates = candidates.filter((candidate) => candidate.provider === 'plaid')
   const csvCandidates = candidates.filter((candidate) => candidate.provider === 'csv')
-  const normalizedCardSearch = cardSearch.trim().toLowerCase()
-  const visibleCardCandidates = plaidCandidates.filter((candidate) => !normalizedCardSearch || `${candidate.merchant} ${candidate.account_name}`.toLowerCase().includes(normalizedCardSearch))
+  const visibleCardCandidates = filterCardCandidates(plaidCandidates, cardSearch)
   const choosingCard = plaidCandidates.find((candidate) => candidate.id === choosingCardId) ?? null
   const cardTracker = activeTrackers.find((tracker) => tracker.id === cardTrackerId) ?? null
   const cardCategories = categories.filter((category) => category.collection_id === cardTracker?.collection_id && category.kind === choosingCard?.kind)
@@ -196,24 +196,17 @@ export function ImportPage() {
     }
   }
 
-  function suggestedCardCategory(candidate: ImportCandidate, tracker: Tracker): Category | null {
-    const hint = candidate.category_hint.toLowerCase().replaceAll('_', ' ')
-    return categories.find((category) => category.collection_id === tracker.collection_id && category.kind === candidate.kind && (
-      hint.includes(category.name.toLowerCase()) || category.name.toLowerCase().includes(hint)
-    )) ?? null
-  }
-
   function openTrackerPicker(candidate: ImportCandidate) {
     const initialTracker = active ?? activeTrackers[0] ?? null
     setChoosingCardId(candidate.id)
     setCardTrackerId(initialTracker?.id ?? '')
-    setCardCategoryId(initialTracker ? suggestedCardCategory(candidate, initialTracker)?.id ?? '' : '')
+    setCardCategoryId(initialTracker ? suggestCardCategory(candidate, initialTracker, categories)?.id ?? '' : '')
   }
 
   function chooseCardTracker(trackerId: string) {
     const tracker = activeTrackers.find((row) => row.id === trackerId) ?? null
     setCardTrackerId(trackerId)
-    setCardCategoryId(choosingCard && tracker ? suggestedCardCategory(choosingCard, tracker)?.id ?? '' : '')
+    setCardCategoryId(choosingCard && tracker ? suggestCardCategory(choosingCard, tracker, categories)?.id ?? '' : '')
   }
 
   async function addCardTransaction(candidate: ImportCandidate, tracker: Tracker, categoryId?: string | null) {
@@ -221,7 +214,7 @@ export function ImportPage() {
     setError(null)
     try {
       const resolvedCategoryId = categoryId === undefined
-        ? suggestedCardCategory(candidate, tracker)?.id ?? null
+        ? suggestCardCategory(candidate, tracker, categories)?.id ?? null
         : categoryId
       await commitImportCandidate({ candidate, trackerId: tracker.id, categoryId: resolvedCategoryId })
       setChoosingCardId(null)

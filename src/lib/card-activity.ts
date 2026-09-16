@@ -1,0 +1,20 @@
+import type { Category, ImportCandidate, Tracker, TrackerCollection } from '../types'
+
+export function listActiveTrackers(trackers: Tracker[], collections: TrackerCollection[]): Tracker[] {
+  const activeCollectionIds = new Set(collections.filter((collection) => !collection.archived_at).map((collection) => collection.id))
+  return trackers.filter((tracker) => !tracker.archived_at && activeCollectionIds.has(tracker.collection_id))
+}
+
+export function filterCardCandidates(candidates: ImportCandidate[], search: string): ImportCandidate[] {
+  const query = search.trim().toLowerCase()
+  if (!query) return candidates
+  return candidates.filter((candidate) => `${candidate.merchant} ${candidate.account_name}`.toLowerCase().includes(query))
+}
+
+export function suggestCardCategory(candidate: ImportCandidate, tracker: Tracker, categories: Category[]): Category | null {
+  const hint = candidate.category_hint.toLowerCase().replaceAll('_', ' ')
+  if (!hint) return null
+  return categories.find((category) => category.collection_id === tracker.collection_id && category.kind === candidate.kind && (
+    hint.includes(category.name.toLowerCase()) || category.name.toLowerCase().includes(hint)
+  )) ?? null
+}
