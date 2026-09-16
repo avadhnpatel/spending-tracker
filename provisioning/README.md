@@ -103,6 +103,31 @@ In Vercel → **spending-tracker** → **Settings** → **Environment Variables*
 `SETUP_BASE_URL` is already covered in the first Vercel step above. Apply every provider value to Production and Preview only when the preview
 uses matching provider callback URLs. Redeploy after adding them.
 
+### 6. Account gateway and returning users
+
+The public `spendingtrkr.com` deployment is an account gateway, not a shared
+financial-data app. It uses the same provisioning Supabase project only for a
+verified email directory (`private_apps`). It never stores transactions or
+Plaid credentials.
+
+1. Run the latest `provisioning/schema.sql` in the provisioning project's SQL
+   editor. This adds the durable `private_apps` directory and owner columns to
+   setup sessions.
+2. In that provisioning project's **Authentication → URL Configuration**, add
+   `https://spendingtrkr.com/account/callback` (and the temporary Vercel URL
+   while testing) to Redirect URLs. Ensure Email authentication is enabled.
+3. Add these public variables to the gateway Vercel deployment and redeploy:
+   `VITE_DIRECTORY_SUPABASE_URL` and
+   `VITE_DIRECTORY_SUPABASE_PUBLISHABLE_KEY`. Their values are the provisioning
+   project URL and its **publishable** key. Do not use the service-role key.
+
+After an email link is verified, the gateway finds the user's private app in
+the directory and redirects web visitors to it. A native device receives the
+private project's runtime configuration only after the same verified directory
+session completes setup. Existing deployed private apps created before this
+directory feature must be added to `private_apps` once (or run a recovery flow)
+before they can be discovered on a new device.
+
 ## Security boundaries
 
 - Provider secrets and OAuth tokens exist only in Vercel server functions and

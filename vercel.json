@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/setup/provision.ts": {
-      "includeFiles": ["supabase/schema.sql", "supabase/functions/**"],
+      "includeFiles": "supabase/**",
       "maxDuration": 60
     }
   },

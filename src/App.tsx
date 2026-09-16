@@ -27,6 +27,8 @@ const ImportPage = lazy(() =>
 const LoginPage = lazy(() =>
   import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })),
 )
+const AccountPage = lazy(() => import('./pages/AccountPage').then((module) => ({ default: module.AccountPage })))
+const AccountCallbackPage = lazy(() => import('./pages/AccountCallbackPage').then((module) => ({ default: module.AccountCallbackPage })))
 const MorePage = lazy(() =>
   import('./pages/MorePage').then((module) => ({ default: module.MorePage })),
 )
@@ -47,7 +49,9 @@ const TrackersPage = lazy(() =>
 )
 
 function ProtectedApp() {
-  const { loading, user } = useAuth()
+  const { configured, loading, user } = useAuth()
+
+  if (!configured) return <Navigate to="/account" replace />
 
   if (loading) {
     return (
@@ -71,6 +75,8 @@ export default function App() {
       }
     >
       <Routes>
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/account/callback" element={<AccountCallbackPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/setup" element={<SetupPage />} />

@@ -34,8 +34,7 @@ export function SetupPage() {
   useEffect(() => {
     async function load() {
       try {
-        let response = await fetch('/api/setup/session')
-        if (response.status === 404) response = await fetch('/api/setup/session', { method: 'POST' })
+        const response = await fetch('/api/setup/session')
         setSession(await readJson<SetupSession>(response))
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not start setup')

@@ -44,4 +44,18 @@ export type SetupSession = {
   expires_at: string
   created_at: string
   updated_at: string
+  directory_user_id: string | null
+  directory_email: string | null
+}
+
+export type DirectoryUser = { id: string; email?: string | null }
+
+export type PrivateApp = {
+  directory_user_id: string
+  email: string
+  deployment_url: string
+  supabase_project_ref: string
+  supabase_publishable_key: string
+  vercel_project_id: string | null
+  repository_full_name: string | null
 }

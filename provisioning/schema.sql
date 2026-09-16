@@ -31,8 +31,30 @@ create table if not exists public.provisioning_sessions (
   updated_at timestamptz not null default now()
 );
 
+-- This is the control-plane directory. It intentionally contains no financial
+-- data, Plaid credentials, or provider OAuth tokens.
+create table if not exists public.private_apps (
+  directory_user_id uuid primary key references auth.users (id) on delete cascade,
+  email text not null,
+  deployment_url text not null,
+  supabase_project_ref text not null,
+  supabase_publishable_key text not null,
+  vercel_project_id text,
+  repository_full_name text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists private_apps_email_idx on public.private_apps (lower(email));
+alter table public.private_apps add column if not exists supabase_publishable_key text;
+alter table public.private_apps enable row level security;
+-- There is intentionally no browser policy. The installer server verifies a
+-- directory session before reading or writing this table with its service key.
+
 alter table public.provisioning_sessions
   add column if not exists supabase_publishable_key text,
+  add column if not exists directory_user_id uuid,
+  add column if not exists directory_email text,
   add column if not exists mobile_handoff_hash text,
   add column if not exists mobile_handoff_secret_encrypted text,
   add column if not exists mobile_claim_hash text;

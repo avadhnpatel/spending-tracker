@@ -1,6 +1,6 @@
 import { allowMethods, publicError } from '../_lib/http.js'
 import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, getSupabasePublishableKey } from '../_lib/providers.js'
-import { publicSession, sessionFromRequest, updateSession } from '../_lib/store.js'
+import { publicSession, savePrivateApp, sessionFromRequest, updateSession } from '../_lib/store.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
 
 type Input = { organizationSlug?: string; projectName?: string }
@@ -50,6 +50,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
         supabase_refresh_token_encrypted: null,
         vercel_token_encrypted: null,
       })
+      await savePrivateApp(session)
       return response.status(200).json(publicSession(session))
     }
 

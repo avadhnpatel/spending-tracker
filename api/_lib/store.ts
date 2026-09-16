@@ -1,6 +1,6 @@
 import { decryptSecret, encryptSecret, hashSecret, randomToken } from './crypto.js'
 import { getCookie, setSessionCookie } from './http.js'
-import type { ApiRequest, ApiResponse, Provider, SetupSession } from './types.js'
+import type { ApiRequest, ApiResponse, PrivateApp, Provider, SetupSession } from './types.js'
 
 function databaseConfig(): { url: string; key: string } {
   const url = process.env.SETUP_SUPABASE_URL?.replace(/\/$/, '')
@@ -25,12 +25,12 @@ async function dbRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (text ? JSON.parse(text) : null) as T
 }
 
-export async function createSession(response: ApiResponse): Promise<SetupSession> {
+export async function createSession(response: ApiResponse, owner?: { id: string; email: string }): Promise<SetupSession> {
   const secret = randomToken()
   const rows = await dbRequest<SetupSession[]>('provisioning_sessions', {
     method: 'POST',
     headers: { Prefer: 'return=representation' },
-    body: JSON.stringify({ secret_hash: hashSecret(secret), status: 'connecting' }),
+    body: JSON.stringify({ secret_hash: hashSecret(secret), status: 'connecting', directory_user_id: owner?.id ?? null, directory_email: owner?.email ?? null }),
   })
   const session = rows[0]
   if (!session) throw new Error('Could not create setup session')
@@ -38,7 +38,7 @@ export async function createSession(response: ApiResponse): Promise<SetupSession
   return session
 }
 
-export async function createMobileSession(): Promise<{ session: SetupSession; browserToken: string; claimCode: string }> {
+export async function createMobileSession(owner?: { id: string; email: string }): Promise<{ session: SetupSession; browserToken: string; claimCode: string }> {
   const sessionSecret = randomToken()
   const browserToken = randomToken()
   const claimCode = randomToken()
@@ -51,11 +51,36 @@ export async function createMobileSession(): Promise<{ session: SetupSession; br
       mobile_handoff_hash: hashSecret(browserToken),
       mobile_handoff_secret_encrypted: encryptSecret(sessionSecret),
       mobile_claim_hash: hashSecret(claimCode),
+      directory_user_id: owner?.id ?? null,
+      directory_email: owner?.email ?? null,
     }),
   })
   const session = rows[0]
   if (!session) throw new Error('Could not create mobile setup session')
   return { session, browserToken, claimCode }
+}
+
+export async function privateAppForUser(userId: string): Promise<PrivateApp | null> {
+  const rows = await dbRequest<PrivateApp[]>(`private_apps?directory_user_id=eq.${encodeURIComponent(userId)}&select=*`)
+  return rows[0] ?? null
+}
+
+export async function savePrivateApp(session: SetupSession): Promise<void> {
+  if (!session.directory_user_id || !session.directory_email || !session.deployment_url || !session.supabase_project_ref) return
+  await dbRequest<PrivateApp[]>('private_apps', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({
+      directory_user_id: session.directory_user_id,
+      email: session.directory_email.toLowerCase(),
+      deployment_url: session.deployment_url,
+      supabase_project_ref: session.supabase_project_ref,
+      supabase_publishable_key: session.supabase_publishable_key,
+      vercel_project_id: session.vercel_project_id,
+      repository_full_name: session.repository_full_name,
+      updated_at: new Date().toISOString(),
+    }),
+  })
 }
 
 export async function sessionFromRequest(request: ApiRequest): Promise<SetupSession | null> {

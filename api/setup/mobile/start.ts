@@ -1,4 +1,5 @@
 import { setupBaseUrl, publicError } from '../../_lib/http.js'
+import { directoryUserFromRequest } from '../../_lib/directory.js'
 import { createMobileSession } from '../../_lib/store.js'
 import type { ApiRequest, ApiResponse } from '../../_lib/types.js'
 
@@ -9,7 +10,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     return
   }
   try {
-    const { session, browserToken, claimCode } = await createMobileSession()
+    const owner = await directoryUserFromRequest(request)
+    const { session, browserToken, claimCode } = await createMobileSession(owner)
     const url = new URL('/api/setup/mobile/activate', setupBaseUrl())
     url.searchParams.set('token', browserToken)
     response.status(201).json({

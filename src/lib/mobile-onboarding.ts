@@ -52,9 +52,9 @@ async function finishFromUrl(url: string): Promise<boolean> {
   return true
 }
 
-export async function startPrivateSetup(): Promise<void> {
+export async function startPrivateSetup(directoryAccessToken?: string): Promise<void> {
   if (!isNativePlatform()) { window.location.assign('/setup'); return }
-  const response = await fetch(`${provisioningBaseUrl()}/api/setup/mobile/start`, { method: 'POST' })
+  const response = await fetch(`${provisioningBaseUrl()}/api/setup/mobile/start`, { method: 'POST', headers: directoryAccessToken ? { Authorization: `Bearer ${directoryAccessToken}` } : {} })
   const setup = await readJson<MobileSetupStart>(response)
   await setPending(setup)
   await Browser.open({ url: setup.setupUrl, presentationStyle: 'fullscreen' })
