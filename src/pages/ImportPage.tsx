@@ -7,8 +7,8 @@ import { formatDate, formatMoney } from '../lib/format'
 import { connectPlaid, resumePlaidRedirect, syncPlaid } from '../lib/plaid'
 import {
   commitImportCandidate,
-  listCategories,
   listFinancialAccounts,
+  listImportCategories,
   listImportCandidates,
   stageCsvCandidates,
   updateImportCandidate,
@@ -20,7 +20,7 @@ type ReviewFilter = 'all' | 'included' | 'excluded'
 
 export function ImportPage() {
   const { user } = useAuth()
-  const { collections, trackers, activeCollection, createTracker } = useTrackers()
+  const { collections, trackers, activeCollection, active, createTracker } = useTrackers()
   const [candidates, setCandidates] = useState<ImportCandidate[]>([])
   const [accounts, setAccounts] = useState<FinancialAccount[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -34,13 +34,22 @@ export function ImportPage() {
   const [error, setError] = useState<string | null>(null)
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all')
   const [confirmingImport, setConfirmingImport] = useState(false)
+  const [cardSearch, setCardSearch] = useState('')
+  const [choosingCardId, setChoosingCardId] = useState<string | null>(null)
+  const [cardTrackerId, setCardTrackerId] = useState('')
+  const [cardCategoryId, setCardCategoryId] = useState('')
 
   const liveCollections = collections.filter((collection) => !collection.archived_at)
   const selectedCollection = liveCollections.find((collection) => collection.id === collectionId) ?? liveCollections[0] ?? null
   const collectionTrackers = trackers.filter((tracker) => tracker.collection_id === selectedCollection?.id && !tracker.archived_at)
-  const categoryTracker = selectedCollection?.kind === 'custom'
-    ? collectionTrackers.find((tracker) => tracker.id === customTrackerId) ?? collectionTrackers[0]
-    : collectionTrackers[0]
+  const activeTrackers = trackers.filter((tracker) => !tracker.archived_at && liveCollections.some((collection) => collection.id === tracker.collection_id))
+  const plaidCandidates = candidates.filter((candidate) => candidate.provider === 'plaid')
+  const csvCandidates = candidates.filter((candidate) => candidate.provider === 'csv')
+  const normalizedCardSearch = cardSearch.trim().toLowerCase()
+  const visibleCardCandidates = plaidCandidates.filter((candidate) => !normalizedCardSearch || `${candidate.merchant} ${candidate.account_name}`.toLowerCase().includes(normalizedCardSearch))
+  const choosingCard = plaidCandidates.find((candidate) => candidate.id === choosingCardId) ?? null
+  const cardTracker = activeTrackers.find((tracker) => tracker.id === cardTrackerId) ?? null
+  const cardCategories = categories.filter((category) => category.collection_id === cardTracker?.collection_id && category.kind === choosingCard?.kind)
 
   const refresh = useCallback(async () => {
     const [candidateRows, accountRows] = await Promise.all([listImportCandidates(), listFinancialAccounts()])
@@ -77,27 +86,28 @@ export function ImportPage() {
   }, [collectionTrackers, customTrackerId, selectedCollection])
 
   useEffect(() => {
-    if (!categoryTracker || !selectedCollection) {
+    const collectionIds = collections.filter((collection) => !collection.archived_at).map((collection) => collection.id)
+    if (!collectionIds.length) {
       setCategories([])
       return
     }
-    void listCategories(categoryTracker.id, selectedCollection.id).then(setCategories, (err) => setError(err.message))
-  }, [categoryTracker, selectedCollection])
+    void listImportCategories(collectionIds).then(setCategories, (err) => setError(err.message))
+  }, [collections])
 
   useEffect(() => {
     setChoices((current) => {
       const next = { ...current }
-      for (const candidate of candidates) {
+      for (const candidate of candidates.filter((row) => row.provider === 'csv')) {
         if (next[candidate.id]) continue
         const hint = candidate.category_hint.toLowerCase().replaceAll('_', ' ')
-        const category = categories.find((row) => row.kind === candidate.kind && (
+        const category = categories.find((row) => row.collection_id === selectedCollection?.id && row.kind === candidate.kind && (
           hint.includes(row.name.toLowerCase()) || row.name.toLowerCase().includes(hint)
         ))
         next[candidate.id] = { included: false, categoryId: category?.id ?? null }
       }
       return next
     })
-  }, [candidates, categories])
+  }, [candidates, categories, selectedCollection?.id])
 
   function destination(candidate: ImportCandidate): Tracker | null {
     if (!selectedCollection) return null
@@ -186,13 +196,51 @@ export function ImportPage() {
     }
   }
 
+  function suggestedCardCategory(candidate: ImportCandidate, tracker: Tracker): Category | null {
+    const hint = candidate.category_hint.toLowerCase().replaceAll('_', ' ')
+    return categories.find((category) => category.collection_id === tracker.collection_id && category.kind === candidate.kind && (
+      hint.includes(category.name.toLowerCase()) || category.name.toLowerCase().includes(hint)
+    )) ?? null
+  }
+
+  function openTrackerPicker(candidate: ImportCandidate) {
+    const initialTracker = active ?? activeTrackers[0] ?? null
+    setChoosingCardId(candidate.id)
+    setCardTrackerId(initialTracker?.id ?? '')
+    setCardCategoryId(initialTracker ? suggestedCardCategory(candidate, initialTracker)?.id ?? '' : '')
+  }
+
+  function chooseCardTracker(trackerId: string) {
+    const tracker = activeTrackers.find((row) => row.id === trackerId) ?? null
+    setCardTrackerId(trackerId)
+    setCardCategoryId(choosingCard && tracker ? suggestedCardCategory(choosingCard, tracker)?.id ?? '' : '')
+  }
+
+  async function addCardTransaction(candidate: ImportCandidate, tracker: Tracker, categoryId?: string | null) {
+    setBusy(true)
+    setError(null)
+    try {
+      const resolvedCategoryId = categoryId === undefined
+        ? suggestedCardCategory(candidate, tracker)?.id ?? null
+        : categoryId
+      await commitImportCandidate({ candidate, trackerId: tracker.id, categoryId: resolvedCategoryId })
+      setChoosingCardId(null)
+      setNotice(`${candidate.merchant} was added to ${tracker.name}.`)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add this card transaction')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function importReviewed() {
     setConfirmingImport(false)
     setBusy(true)
     setError(null)
     let imported = 0
     try {
-      for (const candidate of candidates) {
+      for (const candidate of csvCandidates) {
         const choice = choices[candidate.id] ?? { included: false, categoryId: null }
         if (!choice.included) {
           await updateImportCandidate(candidate.id, { status: 'excluded' })
@@ -214,7 +262,7 @@ export function ImportPage() {
   }
 
   const missingMonths = selectedCollection?.kind === 'monthly'
-    ? Array.from(new Set(candidates.filter((candidate) => (
+    ? Array.from(new Set(csvCandidates.filter((candidate) => (
         (choices[candidate.id]?.included ?? false) && !destination(candidate)
       )).map((candidate) => candidate.date.slice(0, 7)))).sort()
     : []
@@ -239,11 +287,11 @@ export function ImportPage() {
     }
   }
 
-  const importableCount = candidates.filter((candidate) => (
+  const importableCount = csvCandidates.filter((candidate) => (
     (choices[candidate.id]?.included ?? false) && destination(candidate)
   )).length
-  const includedCandidates = candidates.filter((candidate) => choices[candidate.id]?.included ?? false)
-  const visibleCandidates = candidates.filter((candidate) => {
+  const includedCandidates = csvCandidates.filter((candidate) => choices[candidate.id]?.included ?? false)
+  const visibleCandidates = csvCandidates.filter((candidate) => {
     const included = choices[candidate.id]?.included ?? false
     return reviewFilter === 'all' || (reviewFilter === 'included' ? included : !included)
   })
@@ -262,7 +310,7 @@ export function ImportPage() {
   }
 
   function setAllIncluded(included: boolean) {
-    setChoices((current) => Object.fromEntries(candidates.map((candidate) => [
+    setChoices((current) => Object.fromEntries(csvCandidates.map((candidate) => [
       candidate.id,
       { ...(current[candidate.id] ?? { categoryId: null }), included },
     ])))
@@ -306,9 +354,9 @@ export function ImportPage() {
           </div>
           <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-medium text-stone-500">Plaid</span>
         </div>
-        {accounts.length ? <p className="mt-3 text-sm text-stone-600">Connected: {accounts.map((account) => `${account.name}${account.mask ? ` •${account.mask}` : ''}`).join(', ')}</p> : null}
+        {accounts.length ? <p className="mt-3 text-sm text-stone-600">Connected securely: {accounts.map((account) => `${account.name}${account.mask ? ` •${account.mask}` : ''}`).join(', ')}. Plaid stays connected between visits.</p> : null}
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" disabled={busy} onClick={() => void connectBank()} className="min-h-12 rounded-xl bg-stone-100 font-medium disabled:opacity-50">Connect account</button>
+          <button type="button" disabled={busy} onClick={() => void connectBank()} className="min-h-12 rounded-xl bg-stone-100 font-medium disabled:opacity-50">{accounts.length ? 'Connect another' : 'Connect account'}</button>
           <button type="button" disabled={busy || !accounts.length} onClick={() => void syncBank()} className="min-h-12 rounded-xl bg-teal-800 font-medium text-white disabled:opacity-50">Sync now</button>
         </div>
       </section>
@@ -316,7 +364,54 @@ export function ImportPage() {
       {notice ? <p className="rounded-2xl bg-teal-50 p-3 text-sm text-teal-900">{notice}</p> : null}
       {error ? <p className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
 
-      {candidates.length ? (
+      {accounts.length || plaidCandidates.length ? (
+        <section className="space-y-3">
+          <div className="rounded-3xl bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Card activity</h2>
+                <p className="mt-1 text-sm text-stone-500">Add a card transaction directly to the tracker where it belongs.</p>
+              </div>
+              <button type="button" disabled={busy || !accounts.length} onClick={() => void syncBank()} className="min-h-10 shrink-0 rounded-xl bg-stone-100 px-3 text-sm font-semibold text-teal-800 disabled:opacity-50">Sync</button>
+            </div>
+            {plaidCandidates.length > 6 ? (
+              <input value={cardSearch} onChange={(event) => setCardSearch(event.target.value)} placeholder="Search card activity" className="mt-4 min-h-11 w-full rounded-xl bg-stone-50 px-3 outline-none" />
+            ) : null}
+            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-stone-400">{plaidCandidates.length} waiting</p>
+          </div>
+
+          {visibleCardCandidates.map((candidate) => (
+            <article key={candidate.id} className="rounded-3xl border border-stone-100 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{candidate.merchant}</p>
+                  <p className="mt-0.5 text-xs text-stone-500">{formatDate(candidate.date)} · {candidate.account_name || 'Plaid'}</p>
+                </div>
+                <p className={`shrink-0 font-semibold ${candidate.kind === 'income' ? 'text-emerald-700' : ''}`}>{candidate.kind === 'income' ? '+' : ''}{formatMoney(candidate.amount)}</p>
+              </div>
+              <div className="mt-2 flex gap-1.5">
+                {candidate.pending ? <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">Pending</span> : null}
+                {candidate.category_hint ? <span className="rounded-full bg-stone-100 px-2 py-1 text-[11px] font-medium capitalize text-stone-500">{candidate.category_hint.toLowerCase().replaceAll('_', ' ')}</span> : null}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button type="button" disabled={busy || !active} onClick={() => active && void addCardTransaction(candidate, active)} className="min-h-12 rounded-xl bg-teal-800 px-3 text-sm font-semibold text-white disabled:opacity-50">
+                  {active ? `Add to ${active.name}` : 'No current tracker'}
+                </button>
+                <button type="button" disabled={busy || !activeTrackers.length} onClick={() => openTrackerPicker(candidate)} className="min-h-12 rounded-xl bg-stone-100 px-3 text-sm font-semibold text-stone-700 disabled:opacity-50">Choose tracker</button>
+              </div>
+            </article>
+          ))}
+
+          {!visibleCardCandidates.length ? (
+            <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
+              <p className="font-medium">{plaidCandidates.length ? 'No matching card transactions' : 'No new card transactions'}</p>
+              <p className="mt-1 text-sm text-stone-500">Tap Sync whenever you want to check for new activity.</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {csvCandidates.length ? (
         <section className="space-y-3">
           <div className="rounded-3xl bg-white p-4 shadow-sm">
             <h2 className="font-semibold">Destination</h2>
@@ -350,11 +445,11 @@ export function ImportPage() {
                 <p className="mt-0.5 text-sm text-stone-500">Only selected items will enter your tracker.</p>
               </div>
               <span className="shrink-0 rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-800">
-                {includedCandidates.length}/{candidates.length}
+                {includedCandidates.length}/{csvCandidates.length}
               </span>
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-100">
-              <div className="h-full rounded-full bg-teal-700 transition-[width] duration-300" style={{ width: `${candidates.length ? (includedCandidates.length / candidates.length) * 100 : 0}%` }} />
+              <div className="h-full rounded-full bg-teal-700 transition-[width] duration-300" style={{ width: `${csvCandidates.length ? (includedCandidates.length / csvCandidates.length) * 100 : 0}%` }} />
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button type="button" onClick={() => setAllIncluded(true)} className="min-h-11 rounded-xl bg-teal-50 px-3 text-sm font-semibold text-teal-800">Select all</button>
@@ -362,9 +457,9 @@ export function ImportPage() {
             </div>
             <div className="mt-3 grid grid-cols-3 rounded-xl bg-stone-100 p-1 text-xs font-semibold">
               {([
-                ['all', `All ${candidates.length}`],
+                ['all', `All ${csvCandidates.length}`],
                 ['included', `Selected ${includedCandidates.length}`],
-                ['excluded', `Skipped ${candidates.length - includedCandidates.length}`],
+                ['excluded', `Skipped ${csvCandidates.length - includedCandidates.length}`],
               ] as const).map(([value, label]) => (
                 <button key={value} type="button" onClick={() => setReviewFilter(value)} className={`min-h-9 rounded-lg px-1 transition ${reviewFilter === value ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}>
                   {label}
@@ -439,9 +534,42 @@ export function ImportPage() {
             <button type="button" disabled={busy || importableCount === 0} onClick={() => setConfirmingImport(true)} className="min-h-12 w-full rounded-xl bg-teal-800 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Importing…' : `Review ${importableCount} selected`}</button>
           </div>
         </section>
-      ) : (
-        <div className="rounded-3xl bg-white p-6 text-center shadow-sm"><p className="font-medium">Nothing waiting for review</p><p className="mt-1 text-sm text-stone-500">Choose a CSV or connect a card to begin.</p></div>
-      )}
+      ) : null}
+
+      {choosingCard ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3" role="dialog" aria-modal="true" aria-labelledby="choose-card-tracker-title">
+          <button type="button" aria-label="Close tracker picker" onClick={() => setChoosingCardId(null)} className="absolute inset-0" />
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl">
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-stone-200" />
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="choose-card-tracker-title" className="truncate text-xl font-semibold">{choosingCard.merchant}</h2>
+                <p className="mt-1 text-sm text-stone-500">Choose where this card transaction belongs.</p>
+              </div>
+              <p className="shrink-0 font-semibold">{formatMoney(choosingCard.amount)}</p>
+            </div>
+            <label className="mt-5 block text-sm font-medium text-stone-600">Tracker
+              <select value={cardTrackerId} onChange={(event) => chooseCardTracker(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl bg-stone-50 px-3 text-stone-800 outline-none">
+                {liveCollections.map((collection) => (
+                  <optgroup key={collection.id} label={collection.name}>
+                    {activeTrackers.filter((tracker) => tracker.collection_id === collection.id).map((tracker) => <option key={tracker.id} value={tracker.id}>{tracker.name}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+            <label className="mt-3 block text-sm font-medium text-stone-600">Category
+              <select value={cardCategoryId} onChange={(event) => setCardCategoryId(event.target.value)} className="mt-1 min-h-12 w-full rounded-xl bg-stone-50 px-3 text-stone-800 outline-none">
+                <option value="">Uncategorized</option>
+                {cardCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </label>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setChoosingCardId(null)} className="min-h-12 rounded-xl bg-stone-100 px-4 font-semibold text-stone-700">Cancel</button>
+              <button type="button" disabled={busy || !cardTracker} onClick={() => cardTracker && void addCardTransaction(choosingCard, cardTracker, cardCategoryId || null)} className="min-h-12 rounded-xl bg-teal-800 px-4 font-semibold text-white disabled:opacity-50">Add transaction</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {confirmingImport ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3" role="dialog" aria-modal="true" aria-labelledby="confirm-import-title">
@@ -449,7 +577,7 @@ export function ImportPage() {
           <div className="relative w-full max-w-lg rounded-3xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl">
             <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-stone-200" />
             <h2 id="confirm-import-title" className="text-xl font-semibold">Import {importableCount} {importableCount === 1 ? 'transaction' : 'transactions'}?</h2>
-            <p className="mt-1 text-sm text-stone-500">Only the transactions you selected will be added. The other {candidates.length - includedCandidates.length} will be skipped.</p>
+            <p className="mt-1 text-sm text-stone-500">Only the transactions you selected will be added. The other {csvCandidates.length - includedCandidates.length} will be skipped.</p>
             <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-stone-50 p-3 text-sm">
               <div><p className="text-stone-500">Expenses</p><p className="mt-1 font-semibold">{formatMoney(selectedExpenses)}</p></div>
               <div><p className="text-stone-500">Income</p><p className="mt-1 font-semibold text-emerald-700">{formatMoney(selectedIncome)}</p></div>

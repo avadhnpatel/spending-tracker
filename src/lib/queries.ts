@@ -143,6 +143,17 @@ export async function listCategories(trackerId: string, collectionId: string): P
   return (categories ?? []).map((category) => mapCategory(category, budgetByCategory.get(category.id)))
 }
 
+export async function listImportCategories(collectionIds: string[]): Promise<Category[]> {
+  if (!collectionIds.length) return []
+  const { data, error } = await requireSupabase()
+    .from('categories')
+    .select('*')
+    .in('collection_id', collectionIds)
+    .order('sort_order')
+  if (error) throw error
+  return (data ?? []).map((category) => mapCategory(category, null))
+}
+
 export async function createCategory(input: {
   trackerId: string
   collectionId: string
