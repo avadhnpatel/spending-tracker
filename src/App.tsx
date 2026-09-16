@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { useAuth } from './context/AuthContext'
+import { isPrivateAppGateway } from './lib/directory'
 
 const ActivityPage = lazy(() =>
   import('./pages/ActivityPage').then((module) => ({ default: module.ActivityPage })),
@@ -51,6 +52,10 @@ const TrackersPage = lazy(() =>
 function ProtectedApp() {
   const { configured, loading, user } = useAuth()
 
+  // The public site only installs or opens a person's private deployment. It
+  // must never fall through to a tracker backed by the gateway's own config.
+  if (isPrivateAppGateway) return <Navigate to="/account" replace />
+
   if (!configured) return <Navigate to="/account" replace />
 
   if (loading) {
@@ -77,8 +82,8 @@ export default function App() {
       <Routes>
         <Route path="/account" element={<AccountPage />} />
         <Route path="/account/callback" element={<AccountCallbackPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/login" element={isPrivateAppGateway ? <Navigate to="/account" replace /> : <LoginPage />} />
+        <Route path="/auth/callback" element={isPrivateAppGateway ? <Navigate to="/account" replace /> : <AuthCallbackPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />

@@ -109,10 +109,12 @@ URLs. Redeploy after adding them.
 
 ### 6. Account gateway and returning users
 
-The public `spendingtrkr.com` deployment is an account gateway, not a shared
-financial-data app. It uses the same provisioning Supabase project only for a
-verified email directory (`private_apps`). It never stores transactions or
-Plaid credentials.
+The public `spendingtrkr.com` deployment is the private-app installer, never a
+shared financial-data app. A verified email automatically starts the GitHub,
+Supabase, and Vercel connection flow for a new user; returning users are sent
+straight to their existing private deployment. The provisioning Supabase
+project stores only the verified-email directory (`private_apps`), never
+transactions or Plaid credentials.
 
 1. Run the latest `provisioning/schema.sql` in the provisioning project's SQL
    editor. This adds the durable `private_apps` directory and owner columns to

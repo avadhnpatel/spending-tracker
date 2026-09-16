@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { directoryCallbackUrl, directorySession, directorySupabase } from '../lib/directory'
 import { startPrivateSetup } from '../lib/mobile-onboarding'
@@ -21,6 +21,8 @@ export function AccountPage() {
   const [busy, setBusy] = useState(false)
   const [app, setApp] = useState<PrivateApp | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
+  const setupStarted = useRef(false)
+  const appOpened = useRef(false)
 
   useEffect(() => {
     async function load() {
@@ -39,6 +41,41 @@ export function AccountPage() {
     void load()
   }, [])
 
+  useEffect(() => {
+    if (!sessionReady || !email || app || setupStarted.current) return
+    setupStarted.current = true
+
+    async function continuePrivateSetup() {
+      const session = await directorySession()
+      if (!session) return
+      setBusy(true); setMessage('Your email is verified. Starting your private setup…')
+      try {
+        if (isNativePlatform()) {
+          await startPrivateSetup(session.access_token)
+          return
+        }
+        await directoryRequest('/api/directory/start-setup', session.access_token, { method: 'POST' })
+        navigate('/setup')
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Could not start private setup')
+        setupStarted.current = false
+      } finally {
+        setBusy(false)
+      }
+    }
+
+    void continuePrivateSetup()
+  }, [app, email, navigate, sessionReady])
+
+  useEffect(() => {
+    if (!app || appOpened.current) return
+    appOpened.current = true
+    void openExistingApp().catch((error: unknown) => {
+      appOpened.current = false
+      setMessage(error instanceof Error ? error.message : 'Could not open your private tracker')
+    })
+  }, [app])
+
   async function requestLink(event: FormEvent) {
     event.preventDefault()
     if (!directorySupabase) return
@@ -46,22 +83,6 @@ export function AccountPage() {
     const { error } = await directorySupabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: directoryCallbackUrl(), shouldCreateUser: true } })
     setBusy(false)
     setMessage(error ? error.message : 'Check your email for a secure sign-in link.')
-  }
-
-  async function startSetup() {
-    const session = await directorySession()
-    if (!session) return
-    setBusy(true); setMessage('')
-    try {
-      if (isNativePlatform()) {
-        await startPrivateSetup(session.access_token)
-        return
-      }
-      await directoryRequest('/api/directory/start-setup', session.access_token, { method: 'POST' })
-      navigate('/setup')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not start private setup')
-    } finally { setBusy(false) }
   }
 
   async function openExistingApp() {
@@ -76,19 +97,19 @@ export function AccountPage() {
 
   if (!directorySupabase) return <GatewayShell><p className="text-red-700">This gateway is not configured yet. Add the directory Supabase URL and publishable key to this deployment.</p></GatewayShell>
   if (!sessionReady) return <GatewayShell><p className="text-stone-500">Loading your account…</p></GatewayShell>
-  if (!email || !app) return (
+  if (!email) return (
     <GatewayShell>
-      <p className="mt-3 text-stone-600">Sign in to open an existing private tracker or create one that you own.</p>
-      <p className="mt-2 text-sm leading-6 text-stone-500">We’ll email a secure Spend link. It returns you here — you do not need a Vercel account.</p>
+      <p className="mt-3 text-stone-600">Create and own your private Spending Tracker.</p>
+      <p className="mt-2 text-sm leading-6 text-stone-500">We’ll verify your email, then guide you through connecting GitHub, Supabase, and Vercel. You do not need a Vercel account before you begin.</p>
       <form onSubmit={requestLink} className="mt-7 space-y-3">
         <input required type="email" autoComplete="email" placeholder="you@email.com" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700" />
         <button disabled={busy} className="min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">{busy ? 'Sending…' : 'Continue with email'}</button>
       </form>
-      {email && sessionReady ? <button type="button" onClick={() => void startSetup()} disabled={busy} className="mt-5 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Create my private Spending Tracker</button> : null}
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
-  return <GatewayShell><p className="mt-3 text-stone-600">Your private tracker is ready.</p><button type="button" onClick={() => void openExistingApp()} className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-teal-800 px-5 font-semibold text-white">Open my Spending Tracker →</button></GatewayShell>
+  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">Preparing your private setup…</p><p className="mt-2 text-sm leading-6 text-stone-500">Next, you’ll connect the services that will own your code, database, and deployment.</p>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}{!busy && message ? <button type="button" onClick={() => { setupStarted.current = false; setSessionReady(false); window.setTimeout(() => setSessionReady(true), 0) }} className="mt-5 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900">Try again</button> : null}</GatewayShell>
+  return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }
 
 function GatewayShell({ children }: { children: React.ReactNode }) {
