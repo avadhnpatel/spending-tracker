@@ -21,6 +21,7 @@ export function AccountPage() {
   const [busy, setBusy] = useState(false)
   const [app, setApp] = useState<PrivateApp | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
+  const [directoryAccessToken, setDirectoryAccessToken] = useState<string | null>(null)
   const setupStarted = useRef(false)
   const appOpened = useRef(false)
 
@@ -29,6 +30,7 @@ export function AccountPage() {
       const session = await directorySession()
       if (!session) return setSessionReady(true)
       setEmail(session.user.email ?? '')
+      setDirectoryAccessToken(session.access_token)
       try {
         const result = await directoryRequest<{ app: PrivateApp | null }>('/api/directory/me', session.access_token)
         setApp(result.app)
@@ -42,19 +44,19 @@ export function AccountPage() {
   }, [])
 
   useEffect(() => {
-    if (!sessionReady || !email || app || setupStarted.current) return
+    const accessToken = directoryAccessToken
+    if (!sessionReady || !accessToken || app || setupStarted.current) return
+    const verifiedAccessToken: string = accessToken
     setupStarted.current = true
 
     async function continuePrivateSetup() {
-      const session = await directorySession()
-      if (!session) return
       setBusy(true); setMessage('Your email is verified. Starting your private setup…')
       try {
         if (isNativePlatform()) {
-          await startPrivateSetup(session.access_token)
+          await startPrivateSetup(verifiedAccessToken)
           return
         }
-        await directoryRequest('/api/directory/start-setup', session.access_token, { method: 'POST' })
+        await directoryRequest('/api/directory/start-setup', verifiedAccessToken, { method: 'POST' })
         navigate('/setup')
       } catch (error) {
         setMessage(error instanceof Error ? error.message : 'Could not start private setup')
@@ -65,7 +67,7 @@ export function AccountPage() {
     }
 
     void continuePrivateSetup()
-  }, [app, email, navigate, sessionReady])
+  }, [app, directoryAccessToken, navigate, sessionReady])
 
   useEffect(() => {
     if (!app || appOpened.current) return
@@ -97,7 +99,7 @@ export function AccountPage() {
 
   if (!directorySupabase) return <GatewayShell><p className="text-red-700">This gateway is not configured yet. Add the directory Supabase URL and publishable key to this deployment.</p></GatewayShell>
   if (!sessionReady) return <GatewayShell><p className="text-stone-500">Loading your account…</p></GatewayShell>
-  if (!email) return (
+  if (!directoryAccessToken) return (
     <GatewayShell>
       <p className="mt-3 text-stone-600">Create and own your private Spending Tracker.</p>
       <p className="mt-2 text-sm leading-6 text-stone-500">We’ll verify your email, then guide you through connecting GitHub, Supabase, and Vercel. You do not need a Vercel account before you begin.</p>
