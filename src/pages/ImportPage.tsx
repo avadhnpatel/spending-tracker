@@ -16,6 +16,7 @@ import {
 import type { Category, FinancialAccount, ImportCandidate, Tracker } from '../types'
 
 type ReviewChoice = { included: boolean; categoryId: string | null }
+type ReviewFilter = 'all' | 'included' | 'excluded'
 
 export function ImportPage() {
   const { user } = useAuth()
@@ -31,6 +32,7 @@ export function ImportPage() {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all')
 
   const liveCollections = collections.filter((collection) => !collection.archived_at)
   const selectedCollection = liveCollections.find((collection) => collection.id === collectionId) ?? liveCollections[0] ?? null
@@ -238,6 +240,31 @@ export function ImportPage() {
   const importableCount = candidates.filter((candidate) => (
     (choices[candidate.id]?.included ?? true) && destination(candidate)
   )).length
+  const includedCandidates = candidates.filter((candidate) => choices[candidate.id]?.included ?? true)
+  const visibleCandidates = candidates.filter((candidate) => {
+    const included = choices[candidate.id]?.included ?? true
+    return reviewFilter === 'all' || (reviewFilter === 'included' ? included : !included)
+  })
+  const selectedExpenses = includedCandidates
+    .filter((candidate) => candidate.kind === 'expense')
+    .reduce((total, candidate) => total + candidate.amount, 0)
+  const selectedIncome = includedCandidates
+    .filter((candidate) => candidate.kind === 'income')
+    .reduce((total, candidate) => total + candidate.amount, 0)
+
+  function setCandidateIncluded(candidate: ImportCandidate, included: boolean) {
+    setChoices((current) => {
+      const choice = current[candidate.id] ?? { included: true, categoryId: null }
+      return { ...current, [candidate.id]: { ...choice, included } }
+    })
+  }
+
+  function setAllIncluded(included: boolean) {
+    setChoices((current) => Object.fromEntries(candidates.map((candidate) => [
+      candidate.id,
+      { ...(current[candidate.id] ?? { categoryId: null }), included },
+    ])))
+  }
 
   return (
     <div className="space-y-5 pb-6">
@@ -314,21 +341,74 @@ export function ImportPage() {
             )}
           </div>
 
-          <div className="flex items-end justify-between px-1">
-            <div><h2 className="font-semibold">Review</h2><p className="text-sm text-stone-500">{candidates.length} waiting</p></div>
-            <button type="button" onClick={() => setChoices(Object.fromEntries(candidates.map((candidate) => [candidate.id, { ...choices[candidate.id], included: true }]))) } className="text-sm font-medium text-teal-800">Select all</button>
+          <div className="rounded-3xl bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Choose transactions</h2>
+                <p className="mt-0.5 text-sm text-stone-500">Only selected items will enter your tracker.</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-800">
+                {includedCandidates.length}/{candidates.length}
+              </span>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-stone-100">
+              <div className="h-full rounded-full bg-teal-700 transition-[width] duration-300" style={{ width: `${candidates.length ? (includedCandidates.length / candidates.length) * 100 : 0}%` }} />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setAllIncluded(true)} className="min-h-11 rounded-xl bg-teal-50 px-3 text-sm font-semibold text-teal-800">Select all</button>
+              <button type="button" onClick={() => setAllIncluded(false)} className="min-h-11 rounded-xl bg-stone-100 px-3 text-sm font-semibold text-stone-600">Clear all</button>
+            </div>
+            <div className="mt-3 grid grid-cols-3 rounded-xl bg-stone-100 p-1 text-xs font-semibold">
+              {([
+                ['all', `All ${candidates.length}`],
+                ['included', `Selected ${includedCandidates.length}`],
+                ['excluded', `Skipped ${candidates.length - includedCandidates.length}`],
+              ] as const).map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setReviewFilter(value)} className={`min-h-9 rounded-lg px-1 transition ${reviewFilter === value ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {includedCandidates.length ? (
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-stone-100 pt-3 text-sm">
+                <span className="text-stone-500">Selected totals</span>
+                <span className="text-right font-medium">
+                  {selectedExpenses ? `${formatMoney(selectedExpenses)} spent` : ''}
+                  {selectedExpenses && selectedIncome ? ' · ' : ''}
+                  {selectedIncome ? `${formatMoney(selectedIncome)} earned` : ''}
+                </span>
+              </div>
+            ) : null}
           </div>
-          {candidates.map((candidate) => {
+          {visibleCandidates.map((candidate) => {
             const choice = choices[candidate.id] ?? { included: true, categoryId: null }
             const target = destination(candidate)
             const matchingCategories = categories.filter((category) => category.kind === candidate.kind)
             return (
-              <article key={candidate.id} className={`rounded-3xl bg-white p-4 shadow-sm ${choice.included ? '' : 'opacity-55'}`}>
+              <article key={candidate.id} className={`rounded-3xl border p-4 shadow-sm transition ${choice.included ? 'border-teal-100 bg-white' : 'border-transparent bg-stone-100/70 opacity-70'}`}>
                 <div className="flex items-start gap-3">
-                  <input type="checkbox" checked={choice.included} onChange={(event) => setChoices({ ...choices, [candidate.id]: { ...choice, included: event.target.checked } })} className="mt-1 h-5 w-5 accent-teal-800" aria-label={`Include ${candidate.merchant}`} />
+                  <button
+                    type="button"
+                    aria-pressed={choice.included}
+                    aria-label={`${choice.included ? 'Exclude' : 'Include'} ${candidate.merchant}`}
+                    onClick={() => setCandidateIncluded(candidate, !choice.included)}
+                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition ${choice.included ? 'border-teal-700 bg-teal-700 text-white' : 'border-stone-300 bg-white text-transparent'}`}
+                  >
+                    ✓
+                  </button>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3"><p className="truncate font-medium">{candidate.merchant}</p><p className="shrink-0 font-semibold">{formatMoney(candidate.amount)}</p></div>
-                    <p className="mt-0.5 text-xs text-stone-500">{formatDate(candidate.date)} · {candidate.account_name || candidate.provider}{candidate.pending ? ' · Pending' : ''}</p>
+                    <button type="button" onClick={() => setCandidateIncluded(candidate, !choice.included)} className="flex w-full items-start justify-between gap-3 text-left">
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{candidate.merchant}</span>
+                        <span className="mt-0.5 block text-xs text-stone-500">{formatDate(candidate.date)} · {candidate.account_name || (candidate.provider === 'plaid' ? 'Plaid' : 'CSV')}</span>
+                      </span>
+                      <span className={`shrink-0 font-semibold ${candidate.kind === 'income' ? 'text-emerald-700' : ''}`}>{candidate.kind === 'income' ? '+' : ''}{formatMoney(candidate.amount)}</span>
+                    </button>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-stone-100 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-stone-500">{candidate.provider === 'plaid' ? 'Plaid' : 'CSV'}</span>
+                      {candidate.pending ? <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">Pending</span> : null}
+                      {!choice.included ? <span className="rounded-full bg-stone-200 px-2 py-1 text-[11px] font-medium text-stone-600">Will be skipped</span> : null}
+                    </div>
                     {choice.included ? (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <select value={choice.categoryId ?? ''} onChange={(event) => setChoices({ ...choices, [candidate.id]: { ...choice, categoryId: event.target.value || null } })} className="min-w-0 rounded-xl bg-stone-50 px-2 py-2 text-sm outline-none">
@@ -343,7 +423,19 @@ export function ImportPage() {
               </article>
             )
           })}
-          <button type="button" disabled={busy || importableCount === 0} onClick={() => void importReviewed()} className="sticky bottom-24 w-full rounded-2xl bg-teal-800 py-3 font-semibold text-white shadow-lg disabled:opacity-50">{busy ? 'Importing…' : `Import ${importableCount} selected`}</button>
+          {!visibleCandidates.length ? (
+            <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
+              <p className="font-medium">No transactions in this view</p>
+              <button type="button" onClick={() => setReviewFilter('all')} className="mt-2 text-sm font-semibold text-teal-800">Show all transactions</button>
+            </div>
+          ) : null}
+          <div className="sticky bottom-24 z-20 rounded-2xl border border-white/80 bg-white/95 p-3 shadow-lg backdrop-blur">
+            <div className="mb-2 flex items-center justify-between px-1 text-xs text-stone-500">
+              <span>{includedCandidates.length} selected</span>
+              <span>{importableCount === includedCandidates.length ? 'Ready to import' : `${importableCount} have a destination`}</span>
+            </div>
+            <button type="button" disabled={busy || importableCount === 0} onClick={() => void importReviewed()} className="min-h-12 w-full rounded-xl bg-teal-800 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Importing…' : `Import ${importableCount} selected`}</button>
+          </div>
         </section>
       ) : (
         <div className="rounded-3xl bg-white p-6 text-center shadow-sm"><p className="font-medium">Nothing waiting for review</p><p className="mt-1 text-sm text-stone-500">Choose a CSV or connect a card to begin.</p></div>

@@ -95,6 +95,22 @@ html.dark .bg-stone-100 {
   background-color: #292524;
 }
 
+html.dark .bg-white\/95 {
+  background-color: rgb(28 25 23 / 95%);
+}
+
+html.dark .bg-stone-100\/70 {
+  background-color: rgb(41 37 36 / 70%);
+}
+
+html.dark .bg-teal-50 {
+  background-color: rgb(19 78 74 / 38%);
+}
+
+html.dark .border-teal-100 {
+  border-color: rgb(19 78 74 / 75%);
+}
+
 html.dark .bg-stone-200,
 html.dark .bg-stone-200\/60 {
   background-color: #44403c;
@@ -135,6 +151,10 @@ html.dark .border-white\/80 {
 
 html.dark .text-teal-800 {
   color: #5eead4;
+}
+
+html.dark .text-emerald-700 {
+  color: #6ee7b7;
 }
 
 html.dark .text-red-700 {
