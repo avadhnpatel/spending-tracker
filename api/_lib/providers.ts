@@ -88,7 +88,7 @@ export async function deploySpendFunctions(session: SetupSession): Promise<void>
 export async function configureSupabaseAuth(session: SetupSession, siteUrl: string, deploymentUrl?: string): Promise<void> {
   if (!session.supabase_project_ref) throw new Error('Supabase project is missing')
   const baseUrl = siteUrl.startsWith('http') ? siteUrl : `https://${siteUrl}`
-  const redirects = [`${baseUrl}/auth/callback`]
+  const redirects = [`${baseUrl}/auth/callback`, 'spend://auth/callback']
   if (deploymentUrl && deploymentUrl !== baseUrl) redirects.push(`${deploymentUrl}/auth/callback`)
   await providerRequest(`https://api.supabase.com/v1/projects/${session.supabase_project_ref}/config/auth`, {
     method: 'PATCH',

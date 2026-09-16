@@ -1,22 +1,12 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { initializeSupabaseClient, type RuntimeSupabaseConfig } from './runtime-config'
 
-const url =
-  import.meta.env.VITE_SUPABASE_URL ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
-  __SUPABASE_URL__ ||
-  undefined
-const publicKey =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  __SUPABASE_PUBLISHABLE_KEY__ ||
-  undefined
+export let isConfigured = false
+export let supabase: SupabaseClient | null = null
+export let activeSupabaseConfig: RuntimeSupabaseConfig | null = null
 
-export const isConfigured = Boolean(url && publicKey)
-
-export const supabase: SupabaseClient | null = url && publicKey
-  ? createClient(url, publicKey, {
+function createConfiguredClient(url: string, publicKey: string): SupabaseClient {
+  return createClient(url, publicKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -24,7 +14,15 @@ export const supabase: SupabaseClient | null = url && publicKey
         flowType: 'implicit',
       },
     })
-  : null
+}
+
+export async function initializeSupabase(): Promise<void> {
+  await initializeSupabaseClient(createConfiguredClient, (client, config) => {
+    supabase = client
+    activeSupabaseConfig = config
+    isConfigured = Boolean(client)
+  })
+}
 
 export function requireSupabase(): SupabaseClient {
   if (!supabase) {

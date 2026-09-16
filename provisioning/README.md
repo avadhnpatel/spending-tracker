@@ -12,7 +12,7 @@ Create one additional Supabase project owned by you. It stores only short-lived
 installer sessions and encrypted provider tokens; it does not store anyone's
 financial data.
 
-1. Run `provisioning/schema.sql` in the project’s SQL Editor. The `Success. No rows returned` message means it completed correctly.
+1. Run `provisioning/schema.sql` in the project’s SQL Editor. If you already ran an older version, run it again: its `alter table ... add column if not exists` statements safely add the mobile-onboarding fields. The `Success. No rows returned` message means it completed correctly.
 2. In the same Supabase project, open the **Connect** button in the top navigation. Copy the Project URL shown there. It has the form `https://<project-ref>.supabase.co`.
 3. Open **Settings** (the gear at the lower left) → **API Keys**. Under the **Secret keys** section, create a secret key if one does not exist, then copy it. Supabase has renamed the old `service_role` key to a secret key; either elevated server key works with this installer. Never copy the publishable key for this field.
 4. Keep the URL and secret key open only long enough to add them to Vercel using the steps below. Do not put either value in GitHub, `.env` files that are committed, or chat.
@@ -114,6 +114,9 @@ uses matching provider callback URLs. Redeploy after adding them.
   Supabase project. The installer does not receive them.
 - Successful provisioning must delete OAuth tokens. Failed and abandoned rows
   are removed by the expiry cleanup.
+- iOS onboarding uses a one-time browser handoff token plus a separate device
+  claim code. The browser never receives the claim code, and the native app
+  receives only its Supabase URL, publishable key, and deployed web URL.
 
 ## Test the completed installer
 

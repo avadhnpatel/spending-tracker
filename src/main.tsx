@@ -5,18 +5,26 @@ import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { TrackerProvider } from './context/TrackerContext'
 import { applyTheme, getThemePreference } from './lib/theme'
+import { initializeSupabase } from './lib/supabase'
+import { initializeMobileOnboarding } from './lib/mobile-onboarding'
 import './index.css'
 
 applyTheme(getThemePreference())
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <TrackerProvider>
-          <App />
-        </TrackerProvider>
-      </AuthProvider>
-    </BrowserRouter>
-  </StrictMode>,
-)
+async function start() {
+  await initializeSupabase()
+  await initializeMobileOnboarding()
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <BrowserRouter>
+        <AuthProvider>
+          <TrackerProvider>
+            <App />
+          </TrackerProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </StrictMode>,
+  )
+}
+
+void start()

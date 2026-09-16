@@ -36,6 +36,10 @@ export type SetupSession = {
   supabase_project_ref: string | null
   vercel_project_id: string | null
   deployment_url: string | null
+  supabase_publishable_key: string | null
+  mobile_handoff_hash: string | null
+  mobile_handoff_secret_encrypted: string | null
+  mobile_claim_hash: string | null
   error_message: string | null
   expires_at: string
   created_at: string

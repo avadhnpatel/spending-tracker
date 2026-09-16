@@ -31,7 +31,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       await deploySpendFunctions(session)
       const publishableKey = await getSupabasePublishableKey(session)
       const project = await createVercelProject(session, publishableKey)
-      session = await updateSession(session.id, { vercel_project_id: project.id, status: 'deploying' })
+      session = await updateSession(session.id, { vercel_project_id: project.id, supabase_publishable_key: publishableKey, status: 'deploying' })
       return response.status(202).json(publicSession(session))
     }
 

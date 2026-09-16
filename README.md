@@ -54,6 +54,13 @@ The installer uses a separate, server-only provisioning database. See
 [`provisioning/README.md`](provisioning/README.md) for provider registration,
 callback URLs, environment variables, and security boundaries.
 
+## iOS app
+
+Spend can be packaged as an iOS app with Capacitor. The native app uses the same private
+GitHub/Supabase/Vercel onboarding flow and stores only the selected Supabase URL and publishable
+key on the device. See [`IOS_SETUP.md`](IOS_SETUP.md) for Mac requirements, iOS URL-scheme setup,
+and the physical-device validation checklist.
+
 ## Commands
 
 - `npm run dev` — local development
@@ -61,3 +68,5 @@ callback URLs, environment variables, and security boundaries.
 - `npm run check:api` — type-check Vercel server functions
 - `npm run lint` — run Oxlint
 - `npm run preview` — preview the production build
+- `npm run ios:sync` — build the web app and sync it into the iOS project
+- `npm run ios:open` — open the iOS project in Xcode

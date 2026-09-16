@@ -9,6 +9,7 @@ type SetupSession = {
   supabaseProjectRef: string | null
   vercelProjectId: string | null
   deploymentUrl: string | null
+  mobileHandoff: boolean
   error: string | null
   expiresAt: string
 }
@@ -42,6 +43,11 @@ export function SetupPage() {
     }
     void load()
   }, [])
+
+  useEffect(() => {
+    if (session?.status !== 'complete' || !session.mobileHandoff) return
+    window.location.assign(`spend://setup/complete?session=${encodeURIComponent(session.id)}`)
+  }, [session?.id, session?.mobileHandoff, session?.status])
 
   const completed = useMemo(() => {
     if (!session) return 0
@@ -171,7 +177,7 @@ export function SetupPage() {
             <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
               <p className="font-semibold text-teal-950">Your private Spend app is ready.</p>
               <p className="mt-1 text-sm leading-6 text-teal-900">The temporary provider tokens have been removed from the installer.</p>
-              <a href={session.deploymentUrl} className="mt-4 inline-flex min-h-12 items-center rounded-xl bg-teal-800 px-5 font-semibold text-white">Open my Spend app →</a>
+              {session.mobileHandoff ? <p className="mt-4 text-sm font-semibold text-teal-900">Returning to Spend…</p> : <a href={session.deploymentUrl} className="mt-4 inline-flex min-h-12 items-center rounded-xl bg-teal-800 px-5 font-semibold text-white">Open my Spend app →</a>}
             </section>
           ) : null}
         </div>

@@ -1,4 +1,4 @@
-import { hashSecret, randomToken } from './crypto.js'
+import { decryptSecret, encryptSecret, hashSecret, randomToken } from './crypto.js'
 import { getCookie, setSessionCookie } from './http.js'
 import type { ApiRequest, ApiResponse, Provider, SetupSession } from './types.js'
 
@@ -38,6 +38,26 @@ export async function createSession(response: ApiResponse): Promise<SetupSession
   return session
 }
 
+export async function createMobileSession(): Promise<{ session: SetupSession; browserToken: string; claimCode: string }> {
+  const sessionSecret = randomToken()
+  const browserToken = randomToken()
+  const claimCode = randomToken()
+  const rows = await dbRequest<SetupSession[]>('provisioning_sessions', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      secret_hash: hashSecret(sessionSecret),
+      status: 'connecting',
+      mobile_handoff_hash: hashSecret(browserToken),
+      mobile_handoff_secret_encrypted: encryptSecret(sessionSecret),
+      mobile_claim_hash: hashSecret(claimCode),
+    }),
+  })
+  const session = rows[0]
+  if (!session) throw new Error('Could not create mobile setup session')
+  return { session, browserToken, claimCode }
+}
+
 export async function sessionFromRequest(request: ApiRequest): Promise<SetupSession | null> {
   const cookie = getCookie(request, 'spend_setup_session')
   if (!cookie) return null
@@ -53,6 +73,21 @@ export async function sessionByOAuthState(provider: Provider, state: string): Pr
   const column = `${provider}_oauth_state`
   const rows = await dbRequest<SetupSession[]>(`provisioning_sessions?${column}=eq.${encodeURIComponent(state)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=*`)
   return rows[0] ?? null
+}
+
+export async function sessionByMobileHandoff(token: string): Promise<SetupSession | null> {
+  const rows = await dbRequest<SetupSession[]>(`provisioning_sessions?mobile_handoff_hash=eq.${hashSecret(token)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=*`)
+  return rows[0] ?? null
+}
+
+export async function sessionByMobileClaim(id: string, claimCode: string): Promise<SetupSession | null> {
+  const rows = await dbRequest<SetupSession[]>(`provisioning_sessions?id=eq.${encodeURIComponent(id)}&mobile_claim_hash=eq.${hashSecret(claimCode)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&status=eq.complete&select=*`)
+  return rows[0] ?? null
+}
+
+export function mobileSessionCookieValue(session: SetupSession): string {
+  if (!session.mobile_handoff_secret_encrypted) throw new Error('Mobile setup session is unavailable')
+  return `${session.id}.${decryptSecret(session.mobile_handoff_secret_encrypted)}`
 }
 
 export async function updateSession(id: string, patch: Partial<SetupSession>): Promise<SetupSession> {
@@ -80,6 +115,7 @@ export function publicSession(session: SetupSession) {
     supabaseProjectRef: session.supabase_project_ref,
     vercelProjectId: session.vercel_project_id,
     deploymentUrl: session.deployment_url,
+    mobileHandoff: Boolean(session.mobile_claim_hash),
     error: session.error_message,
     expiresAt: session.expires_at,
   }

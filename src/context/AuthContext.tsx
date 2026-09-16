@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js'
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { isConfigured, supabase } from '../lib/supabase'
+import { authRedirectUrl } from '../lib/platform'
 
 type AuthContextValue = {
   configured: boolean
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signInWithOtp({
           email,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: authRedirectUrl(),
             shouldCreateUser: true,
           },
         })

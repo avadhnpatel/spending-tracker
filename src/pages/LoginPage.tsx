@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { startPrivateSetup } from '../lib/mobile-onboarding'
+import { isNativePlatform } from '../lib/platform'
 
 export function LoginPage() {
   const { configured, user, sendMagicLink } = useAuth()
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [message, setMessage] = useState('')
+  const [setupBusy, setSetupBusy] = useState(false)
 
   if (user) return <Navigate to="/" replace />
 
@@ -23,6 +26,18 @@ export function LoginPage() {
     }
   }
 
+  async function beginPrivateSetup() {
+    setSetupBusy(true)
+    setMessage('')
+    try {
+      await startPrivateSetup()
+    } catch (error) {
+      setStatus('error')
+      setMessage(error instanceof Error ? error.message : 'Could not start private setup')
+      setSetupBusy(false)
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center px-6">
       <p className="text-sm font-semibold tracking-wide text-teal-800 uppercase">Spend</p>
@@ -32,11 +47,22 @@ export function LoginPage() {
       </p>
 
       {!configured ? (
-        <div className="mt-8 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
-          Add <code>VITE_SUPABASE_URL</code> and{' '}
-          <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to{' '}
-          <code>.env</code> (local) or Vercel env vars, then restart the app.
-        </div>
+        isNativePlatform() ? (
+          <div className="mt-8 rounded-3xl border border-teal-200 bg-teal-50 p-5 text-sm text-teal-950">
+            <p className="font-semibold">Set up your private Spend app</p>
+            <p className="mt-1 leading-6 text-teal-900">Connect GitHub, Supabase, and Vercel once. Your financial data stays in your own Supabase project.</p>
+            <button type="button" onClick={() => void beginPrivateSetup()} disabled={setupBusy} className="mt-4 min-h-12 w-full rounded-xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">
+              {setupBusy ? 'Opening setup…' : 'Set up my private Spend'}
+            </button>
+            {message ? <p className="mt-3 text-sm text-red-700">{message}</p> : null}
+          </div>
+        ) : (
+          <div className="mt-8 rounded-2xl bg-amber-50 p-4 text-sm text-amber-950">
+            Add <code>VITE_SUPABASE_URL</code> and{' '}
+            <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to{' '}
+            <code>.env</code> (local) or Vercel env vars, then restart the app.
+          </div>
+        )
       ) : (
         <form onSubmit={onSubmit} className="mt-8 space-y-3">
           <input

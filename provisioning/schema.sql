@@ -21,16 +21,28 @@ create table if not exists public.provisioning_sessions (
   vercel_connected_at timestamptz,
   vercel_project_id text,
   deployment_url text,
+  supabase_publishable_key text,
+  mobile_handoff_hash text,
+  mobile_handoff_secret_encrypted text,
+  mobile_claim_hash text,
   error_message text,
   expires_at timestamptz not null default (now() + interval '2 hours'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+alter table public.provisioning_sessions
+  add column if not exists supabase_publishable_key text,
+  add column if not exists mobile_handoff_hash text,
+  add column if not exists mobile_handoff_secret_encrypted text,
+  add column if not exists mobile_claim_hash text;
+
 create unique index if not exists provisioning_sessions_github_state_idx on public.provisioning_sessions (github_oauth_state) where github_oauth_state is not null;
 create unique index if not exists provisioning_sessions_supabase_state_idx on public.provisioning_sessions (supabase_oauth_state) where supabase_oauth_state is not null;
 create unique index if not exists provisioning_sessions_vercel_state_idx on public.provisioning_sessions (vercel_oauth_state) where vercel_oauth_state is not null;
 create index if not exists provisioning_sessions_expires_idx on public.provisioning_sessions (expires_at);
+create unique index if not exists provisioning_sessions_mobile_handoff_idx on public.provisioning_sessions (mobile_handoff_hash) where mobile_handoff_hash is not null;
+create unique index if not exists provisioning_sessions_mobile_claim_idx on public.provisioning_sessions (mobile_claim_hash) where mobile_claim_hash is not null;
 
 alter table public.provisioning_sessions enable row level security;
 
