@@ -32,6 +32,10 @@ body {
   background: rgb(255 255 255 / 88%);
 }
 
+.quick-add-menu {
+  background: rgb(255 255 255 / 94%);
+}
+
 .tracker-select {
   background: rgb(255 255 255 / 90%);
 }
@@ -80,6 +84,11 @@ html.dark .app-header {
 
 html.dark .bottom-nav {
   background: rgb(28 25 23 / 90%);
+  border-color: rgb(87 83 78 / 65%);
+}
+
+html.dark .quick-add-menu {
+  background: rgb(28 25 23 / 96%);
   border-color: rgb(87 83 78 / 65%);
 }
 
