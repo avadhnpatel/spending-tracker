@@ -33,6 +33,9 @@ const MorePage = lazy(() =>
 const RecurringPage = lazy(() =>
   import('./pages/RecurringPage').then((module) => ({ default: module.RecurringPage })),
 )
+const SetupPage = lazy(() =>
+  import('./pages/SetupPage').then((module) => ({ default: module.SetupPage })),
+)
 const TrackersPage = lazy(() =>
   import('./pages/TrackersPage').then((module) => ({ default: module.TrackersPage })),
 )
@@ -64,6 +67,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route element={<ProtectedApp />}>
           <Route index element={<HomePage />} />
           <Route path="activity" element={<ActivityPage />} />

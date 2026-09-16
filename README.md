@@ -43,9 +43,21 @@ The Vercel Supabase integration is also supported directly through
 After the first deployment, add the exact Vercel callback URL to Supabase Authentication
 URL Configuration, then redeploy if the domain or environment variables changed.
 
+## Automated private copies
+
+The public `/setup` page is the start of a guided installer for friends. It connects
+GitHub, creates a private repository from this template, and connects the user's own
+Supabase and Vercel accounts. Their financial data and free-tier limits belong to
+their projects rather than this app's Supabase project.
+
+The installer uses a separate, server-only provisioning database. See
+[`provisioning/README.md`](provisioning/README.md) for provider registration,
+callback URLs, environment variables, and security boundaries.
+
 ## Commands
 
 - `npm run dev` — local development
 - `npm run build` — type-check and create a production build
+- `npm run check:api` — type-check Vercel server functions
 - `npm run lint` — run Oxlint
 - `npm run preview` — preview the production build

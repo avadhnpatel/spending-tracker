@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run check:api && tsc -b && vite build",
+    "check:api": "tsc -p tsconfig.api.json --noEmit",
     "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview"
