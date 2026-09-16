@@ -1,6 +1,8 @@
 import type {
   Category,
   CollectionKind,
+  FinancialAccount,
+  ImportCandidate,
   Recurring,
   Tracker,
   TrackerCollection,
@@ -201,9 +203,15 @@ export async function getTransaction(id: string): Promise<Transaction | null> {
   return data ? mapTransaction(data) : null
 }
 
-export async function upsertTransaction(input: Omit<Transaction, 'created_at' | 'id'> & { id?: string }): Promise<Transaction> {
+export async function upsertTransaction(input: Omit<Transaction, 'created_at' | 'id' | 'import_candidate_id' | 'source_provider' | 'source_transaction_id' | 'source_account_id'> & {
+  id?: string
+  import_candidate_id?: string | null
+  source_provider?: string | null
+  source_transaction_id?: string | null
+  source_account_id?: string | null
+}): Promise<Transaction> {
   const db = requireSupabase()
-  const payload = { tracker_id: input.tracker_id, category_id: input.category_id, recurring_id: input.recurring_id, amount: input.amount, kind: input.kind, date: input.date, merchant: input.merchant, notes: input.notes, receipt_path: input.receipt_path }
+  const payload = { tracker_id: input.tracker_id, category_id: input.category_id, recurring_id: input.recurring_id, amount: input.amount, kind: input.kind, date: input.date, merchant: input.merchant, notes: input.notes, receipt_path: input.receipt_path, import_candidate_id: input.import_candidate_id ?? null, source_provider: input.source_provider ?? null, source_transaction_id: input.source_transaction_id ?? null, source_account_id: input.source_account_id ?? null }
   if (input.id) {
     const { data, error } = await db.from('transactions').update(payload).eq('id', input.id).select('*').single()
     if (error) throw error
@@ -261,4 +269,50 @@ export async function upsertRecurring(input: Omit<Recurring, 'id'> & { id?: stri
 export async function deleteRecurring(id: string): Promise<void> {
   const { error } = await requireSupabase().from('recurring').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function listFinancialAccounts(): Promise<FinancialAccount[]> {
+  const { data, error } = await requireSupabase().from('financial_accounts').select('*').order('created_at')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function stageCsvCandidates(rows: Array<Omit<ImportCandidate, 'id' | 'connection_id' | 'status' | 'imported_transaction_id' | 'created_at' | 'updated_at'>>): Promise<number> {
+  if (!rows.length) return 0
+  const { error } = await requireSupabase().from('import_candidates').upsert(
+    rows.map((row) => ({ ...row, connection_id: null, status: 'pending' })),
+    { onConflict: 'user_id,provider,external_id', ignoreDuplicates: true },
+  )
+  if (error) throw error
+  return rows.length
+}
+
+export async function listImportCandidates(): Promise<ImportCandidate[]> {
+  const { data, error } = await requireSupabase()
+    .from('import_candidates')
+    .select('*')
+    .eq('status', 'pending')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((row) => ({ ...row, amount: parseAmount(row.amount) }))
+}
+
+export async function updateImportCandidate(id: string, patch: Partial<Pick<ImportCandidate, 'status' | 'imported_transaction_id'>>): Promise<void> {
+  const { error } = await requireSupabase().from('import_candidates').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
+}
+
+export async function commitImportCandidate(input: {
+  candidate: ImportCandidate
+  trackerId: string
+  categoryId: string | null
+}): Promise<Transaction> {
+  const { data, error } = await requireSupabase().rpc('commit_import_candidate', {
+    p_candidate_id: input.candidate.id,
+    p_tracker_id: input.trackerId,
+    p_category_id: input.categoryId,
+  })
+  if (error) throw error
+  return mapTransaction(data)
 }

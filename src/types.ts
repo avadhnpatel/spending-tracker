@@ -62,6 +62,45 @@ export type Transaction = {
   merchant: string
   notes: string
   receipt_path: string | null
+  import_candidate_id: string | null
+  source_provider: string | null
+  source_transaction_id: string | null
+  source_account_id: string | null
+  created_at: string
+}
+
+export type ImportProvider = 'csv' | 'plaid'
+export type ImportStatus = 'pending' | 'imported' | 'excluded' | 'removed'
+
+export type ImportCandidate = {
+  id: string
+  user_id: string
+  provider: ImportProvider
+  external_id: string
+  connection_id: string | null
+  account_id: string | null
+  account_name: string
+  date: string
+  amount: number
+  kind: Kind
+  merchant: string
+  category_hint: string
+  pending: boolean
+  status: ImportStatus
+  imported_transaction_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type FinancialAccount = {
+  id: string
+  user_id: string
+  connection_id: string
+  provider_account_id: string
+  name: string
+  mask: string | null
+  type: string
+  subtype: string
   created_at: string
 }
 

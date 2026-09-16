@@ -21,6 +21,9 @@ const HomePage = lazy(() =>
 const InsightsPage = lazy(() =>
   import('./pages/InsightsPage').then((module) => ({ default: module.InsightsPage })),
 )
+const ImportPage = lazy(() =>
+  import('./pages/ImportPage').then((module) => ({ default: module.ImportPage })),
+)
 const LoginPage = lazy(() =>
   import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })),
 )
@@ -71,6 +74,7 @@ export default function App() {
           <Route path="more/trackers" element={<TrackersPage />} />
           <Route path="more/categories" element={<CategoriesPage />} />
           <Route path="more/recurring" element={<RecurringPage />} />
+          <Route path="more/import" element={<ImportPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
