@@ -48,10 +48,8 @@ Create a GitHub App in GitHub Developer settings. Use:
 
 - Homepage URL: `https://spending-tracker-bice-omega.vercel.app/setup`
 - Callback URL: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/github/callback`
-- Setup URL: `https://spending-tracker-bice-omega.vercel.app/setup`
-- User authorization callback enabled
 
-In GitHub, click your avatar → **Settings** → **Developer settings** → **GitHub Apps** → **New GitHub App**. Enter the values above, enable the user authorization flow, and set these repository permissions: `Administration: write`, `Contents: write`, and `Metadata: read`. Create the app, generate a client secret on its settings page, then install the app on your account for testing.
+In GitHub, click your avatar → **Settings** → **Developer settings** → **GitHub Apps** → **New GitHub App**. Enter the homepage URL and repository permissions above, then create the app. The **Callback URL** may appear only after the app has been created: open the new app’s settings page, find **Identifying and authorizing users**, and enter the callback URL there. Do not enable **Request user authorization (OAuth) during installation** and leave **Setup URL** blank. Spend explicitly starts the OAuth flow when someone presses **Connect GitHub**, so it only needs the callback URL. You do not need webhooks for this installer.
 
 In Vercel, add `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` with the client ID and newly generated client secret. Mark the secret sensitive.
 
