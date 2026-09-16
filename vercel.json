@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/setup/provision.ts": {
+    "api/[...path].ts": {
       "includeFiles": "supabase/**",
       "maxDuration": 60
     }
