@@ -34,7 +34,19 @@ export function clearSessionCookie(response: ApiResponse): void {
 export function setupBaseUrl(): string {
   const value = process.env.SETUP_BASE_URL?.replace(/\/$/, '')
   if (!value) throw new Error('SETUP_BASE_URL is not configured')
-  return value
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error('SETUP_BASE_URL must be a complete public URL')
+  }
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost') {
+    throw new Error('SETUP_BASE_URL must use HTTPS outside local development')
+  }
+  if (url.hostname.endsWith('.vercel.app')) {
+    throw new Error('SETUP_BASE_URL must use the public Spend domain, not a Vercel deployment URL')
+  }
+  return url.origin
 }
 
 export function publicError(error: unknown): string {

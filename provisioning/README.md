@@ -34,7 +34,7 @@ financial data.
 
    | Name | Value to paste |
    | --- | --- |
-   | `SETUP_BASE_URL` | `https://spending-tracker-bice-omega.vercel.app` |
+   | `SETUP_BASE_URL` | `https://spendingtrkr.com` |
    | `SETUP_SUPABASE_URL` | The Project URL from the new `spend-provisioning` Supabase project |
    | `SETUP_SUPABASE_SERVICE_ROLE_KEY` | The **secret key** from that new project’s Settings → API Keys page |
    | `PROVISIONING_ENCRYPTION_KEY` | The output of the local command above |
@@ -46,8 +46,8 @@ financial data.
 
 Create a GitHub App in GitHub Developer settings. Use:
 
-- Homepage URL: `https://spending-tracker-bice-omega.vercel.app/setup`
-- Callback URL: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/github/callback`
+- Homepage URL: `https://spendingtrkr.com/setup`
+- Callback URL: `https://spendingtrkr.com/api/setup/oauth/github/callback`
 
 In GitHub, click your avatar → **Settings** → **Developer settings** → **GitHub Apps** → **New GitHub App**. Enter the homepage URL and repository permissions above, then create the app. The **Callback URL** may appear only after the app has been created: open the new app’s settings page, find **Identifying and authorizing users**, and enter the callback URL there. Do not enable **Request user authorization (OAuth) during installation** and leave **Setup URL** blank. Spend explicitly starts the OAuth flow when someone presses **Connect GitHub**, so it only needs the callback URL. You do not need webhooks for this installer.
 
@@ -65,8 +65,8 @@ This lives in your **Supabase organization settings**, not in an individual proj
 3. Open the **OAuth Apps** tab.
 4. Click **Add application**.
 5. Use a clear name such as `Spend Private Setup` and enter:
-   - App URL: `https://spending-tracker-bice-omega.vercel.app/setup`
-   - Redirect URI: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/supabase/callback`
+   - App URL: `https://spendingtrkr.com/setup`
+   - Redirect URI: `https://spendingtrkr.com/api/setup/oauth/supabase/callback`
 6. The current dashboard does not show a separate client-type setting. That is expected; the client secret it generates is used only by our Vercel server function.
 7. Select only the scopes needed for automated project setup: Organizations (read), Projects (read/write), Database (write), Auth (write), Edge Functions (write), Secrets (read/write), and Storage (write). Leave the other scopes at **No access**.
 8. Click **Create** and immediately copy the client ID and client secret. The secret may only be shown once.
@@ -82,12 +82,12 @@ Use these values in the form:
 
 - Name: `Spend Private Setup`
 - URL slug: `spend-private-setup` (or a unique variation if already taken)
-- Website: `https://spending-tracker-bice-omega.vercel.app/setup`
-- Documentation URL: `https://spending-tracker-bice-omega.vercel.app/setup`
-- Privacy policy URL: `https://spending-tracker-bice-omega.vercel.app/privacy`
-- Terms/EULA URL: `https://spending-tracker-bice-omega.vercel.app/terms`
-- Redirect URL: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/vercel/callback`
-- Configuration URL: `https://spending-tracker-bice-omega.vercel.app/setup`
+- Website: `https://spendingtrkr.com/setup`
+- Documentation URL: `https://spendingtrkr.com/setup`
+- Privacy policy URL: `https://spendingtrkr.com/privacy`
+- Terms/EULA URL: `https://spendingtrkr.com/terms`
+- Redirect URL: `https://spendingtrkr.com/api/setup/oauth/vercel/callback`
+- Configuration URL: `https://spendingtrkr.com/setup`
 - Webhook URL: leave blank
 
 For API scopes, select only: `user` (read), `team` (read), `project` (read/write), `project-env-vars` (read/write), `deployment` (read/write), and `integration-configuration` (read/write). Do not request domains, billing, logs, Edge Config, or global project environment variables.
@@ -100,8 +100,12 @@ In Vercel → **spending-tracker** → **Settings** → **Environment Variables*
 
 ### 5. Shared server configuration
 
-`SETUP_BASE_URL` is already covered in the first Vercel step above. Apply every provider value to Production and Preview only when the preview
-uses matching provider callback URLs. Redeploy after adding them.
+`SETUP_BASE_URL` must be `https://spendingtrkr.com` in production. GitHub,
+Supabase, and Vercel all return to callback routes on that same public domain;
+never use a `*.vercel.app` deployment URL, because Deployment Protection can
+intercept it before the callback reaches Spend. Apply every provider value to
+Production and Preview only when the preview uses matching provider callback
+URLs. Redeploy after adding them.
 
 ### 6. Account gateway and returning users
 

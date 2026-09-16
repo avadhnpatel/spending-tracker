@@ -79,6 +79,7 @@ export function AccountPage() {
   if (!email || !app) return (
     <GatewayShell>
       <p className="mt-3 text-stone-600">Sign in to open an existing private tracker or create one that you own.</p>
+      <p className="mt-2 text-sm leading-6 text-stone-500">We’ll email a secure Spend link. It returns you here — you do not need a Vercel account.</p>
       <form onSubmit={requestLink} className="mt-7 space-y-3">
         <input required type="email" autoComplete="email" placeholder="you@email.com" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700" />
         <button disabled={busy} className="min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">{busy ? 'Sending…' : 'Continue with email'}</button>

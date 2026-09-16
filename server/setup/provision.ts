@@ -1,5 +1,5 @@
 import { allowMethods, publicError } from '../_lib/http.js'
-import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, getSupabasePublishableKey } from '../_lib/providers.js'
+import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, disableVercelAuthentication, getSupabasePublishableKey } from '../_lib/providers.js'
 import { publicSession, savePrivateApp, sessionFromRequest, updateSession } from '../_lib/store.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
 
@@ -32,6 +32,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       const publishableKey = await getSupabasePublishableKey(session)
       const project = await createVercelProject(session, publishableKey)
       session = await updateSession(session.id, { vercel_project_id: project.id, supabase_publishable_key: publishableKey, status: 'deploying' })
+      await disableVercelAuthentication(session)
       return response.status(202).json(publicSession(session))
     }
 
