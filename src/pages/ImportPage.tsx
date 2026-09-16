@@ -33,6 +33,7 @@ export function ImportPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all')
+  const [confirmingImport, setConfirmingImport] = useState(false)
 
   const liveCollections = collections.filter((collection) => !collection.archived_at)
   const selectedCollection = liveCollections.find((collection) => collection.id === collectionId) ?? liveCollections[0] ?? null
@@ -92,7 +93,7 @@ export function ImportPage() {
         const category = categories.find((row) => row.kind === candidate.kind && (
           hint.includes(row.name.toLowerCase()) || row.name.toLowerCase().includes(hint)
         ))
-        next[candidate.id] = { included: true, categoryId: category?.id ?? null }
+        next[candidate.id] = { included: false, categoryId: category?.id ?? null }
       }
       return next
     })
@@ -186,12 +187,13 @@ export function ImportPage() {
   }
 
   async function importReviewed() {
+    setConfirmingImport(false)
     setBusy(true)
     setError(null)
     let imported = 0
     try {
       for (const candidate of candidates) {
-        const choice = choices[candidate.id] ?? { included: true, categoryId: null }
+        const choice = choices[candidate.id] ?? { included: false, categoryId: null }
         if (!choice.included) {
           await updateImportCandidate(candidate.id, { status: 'excluded' })
           continue
@@ -213,7 +215,7 @@ export function ImportPage() {
 
   const missingMonths = selectedCollection?.kind === 'monthly'
     ? Array.from(new Set(candidates.filter((candidate) => (
-        (choices[candidate.id]?.included ?? true) && !destination(candidate)
+        (choices[candidate.id]?.included ?? false) && !destination(candidate)
       )).map((candidate) => candidate.date.slice(0, 7)))).sort()
     : []
 
@@ -238,11 +240,11 @@ export function ImportPage() {
   }
 
   const importableCount = candidates.filter((candidate) => (
-    (choices[candidate.id]?.included ?? true) && destination(candidate)
+    (choices[candidate.id]?.included ?? false) && destination(candidate)
   )).length
-  const includedCandidates = candidates.filter((candidate) => choices[candidate.id]?.included ?? true)
+  const includedCandidates = candidates.filter((candidate) => choices[candidate.id]?.included ?? false)
   const visibleCandidates = candidates.filter((candidate) => {
-    const included = choices[candidate.id]?.included ?? true
+    const included = choices[candidate.id]?.included ?? false
     return reviewFilter === 'all' || (reviewFilter === 'included' ? included : !included)
   })
   const selectedExpenses = includedCandidates
@@ -254,7 +256,7 @@ export function ImportPage() {
 
   function setCandidateIncluded(candidate: ImportCandidate, included: boolean) {
     setChoices((current) => {
-      const choice = current[candidate.id] ?? { included: true, categoryId: null }
+      const choice = current[candidate.id] ?? { included: false, categoryId: null }
       return { ...current, [candidate.id]: { ...choice, included } }
     })
   }
@@ -381,7 +383,7 @@ export function ImportPage() {
             ) : null}
           </div>
           {visibleCandidates.map((candidate) => {
-            const choice = choices[candidate.id] ?? { included: true, categoryId: null }
+            const choice = choices[candidate.id] ?? { included: false, categoryId: null }
             const target = destination(candidate)
             const matchingCategories = categories.filter((category) => category.kind === candidate.kind)
             return (
@@ -434,12 +436,31 @@ export function ImportPage() {
               <span>{includedCandidates.length} selected</span>
               <span>{importableCount === includedCandidates.length ? 'Ready to import' : `${importableCount} have a destination`}</span>
             </div>
-            <button type="button" disabled={busy || importableCount === 0} onClick={() => void importReviewed()} className="min-h-12 w-full rounded-xl bg-teal-800 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Importing…' : `Import ${importableCount} selected`}</button>
+            <button type="button" disabled={busy || importableCount === 0} onClick={() => setConfirmingImport(true)} className="min-h-12 w-full rounded-xl bg-teal-800 px-4 font-semibold text-white disabled:opacity-50">{busy ? 'Importing…' : `Review ${importableCount} selected`}</button>
           </div>
         </section>
       ) : (
         <div className="rounded-3xl bg-white p-6 text-center shadow-sm"><p className="font-medium">Nothing waiting for review</p><p className="mt-1 text-sm text-stone-500">Choose a CSV or connect a card to begin.</p></div>
       )}
+
+      {confirmingImport ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3" role="dialog" aria-modal="true" aria-labelledby="confirm-import-title">
+          <button type="button" aria-label="Close import confirmation" onClick={() => setConfirmingImport(false)} className="absolute inset-0" />
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl">
+            <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-stone-200" />
+            <h2 id="confirm-import-title" className="text-xl font-semibold">Import {importableCount} {importableCount === 1 ? 'transaction' : 'transactions'}?</h2>
+            <p className="mt-1 text-sm text-stone-500">Only the transactions you selected will be added. The other {candidates.length - includedCandidates.length} will be skipped.</p>
+            <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-stone-50 p-3 text-sm">
+              <div><p className="text-stone-500">Expenses</p><p className="mt-1 font-semibold">{formatMoney(selectedExpenses)}</p></div>
+              <div><p className="text-stone-500">Income</p><p className="mt-1 font-semibold text-emerald-700">{formatMoney(selectedIncome)}</p></div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setConfirmingImport(false)} className="min-h-12 rounded-xl bg-stone-100 px-4 font-semibold text-stone-700">Keep reviewing</button>
+              <button type="button" onClick={() => void importReviewed()} className="min-h-12 rounded-xl bg-teal-800 px-4 font-semibold text-white">Import selected</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
