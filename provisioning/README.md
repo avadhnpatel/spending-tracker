@@ -12,14 +12,35 @@ Create one additional Supabase project owned by you. It stores only short-lived
 installer sessions and encrypted provider tokens; it does not store anyone's
 financial data.
 
-1. Run `provisioning/schema.sql` in its SQL editor.
-2. Copy its project URL and service-role key into Vercel as
-   `SETUP_SUPABASE_URL` and `SETUP_SUPABASE_SERVICE_ROLE_KEY`.
-3. Generate a 32-byte base64url encryption key and save it in Vercel as
-   `PROVISIONING_ENCRYPTION_KEY`. Do not paste this key into chat or commit it.
-4. Schedule `select public.delete_expired_provisioning_sessions();` daily with
+1. Run `provisioning/schema.sql` in the project’s SQL Editor. The `Success. No rows returned` message means it completed correctly.
+2. In the same Supabase project, open the **Connect** button in the top navigation. Copy the Project URL shown there. It has the form `https://<project-ref>.supabase.co`.
+3. Open **Settings** (the gear at the lower left) → **API Keys**. Under the **Secret keys** section, create a secret key if one does not exist, then copy it. Supabase has renamed the old `service_role` key to a secret key; either elevated server key works with this installer. Never copy the publishable key for this field.
+4. Keep the URL and secret key open only long enough to add them to Vercel using the steps below. Do not put either value in GitHub, `.env` files that are committed, or chat.
+5. Generate a 32-byte base64url encryption key and save it in Vercel as
+   `PROVISIONING_ENCRYPTION_KEY`. One safe way to generate it locally is:
+
+   ```sh
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+   ```
+
+6. Schedule `select public.delete_expired_provisioning_sessions();` daily with
    Supabase Cron if Cron is available on the project. The two-hour session expiry
    is enforced even without the cleanup schedule.
+
+### Add those values to Vercel now
+
+1. Open [Vercel](https://vercel.com/dashboard), select the existing **spending-tracker** project, then choose **Settings** → **Environment Variables**.
+2. Click **Add New**. Add the following one at a time. Choose **Production** for every value. You can also select **Preview** later, after registering matching preview callback URLs.
+
+   | Name | Value to paste |
+   | --- | --- |
+   | `SETUP_BASE_URL` | `https://spending-tracker-bice-omega.vercel.app` |
+   | `SETUP_SUPABASE_URL` | The Project URL from the new `spend-provisioning` Supabase project |
+   | `SETUP_SUPABASE_SERVICE_ROLE_KEY` | The **secret key** from that new project’s Settings → API Keys page |
+   | `PROVISIONING_ENCRYPTION_KEY` | The output of the local command above |
+
+3. Mark the last two as sensitive if Vercel offers that option. The names must match exactly and none may begin with `VITE_`.
+4. Click **Save** after each variable. Vercel applies variables only to new deployments, so use the **Deployments** tab to redeploy `main` after all four have been saved.
 
 ### 2. GitHub App
 
@@ -30,10 +51,9 @@ Create a GitHub App in GitHub Developer settings. Use:
 - Setup URL: `https://spending-tracker-bice-omega.vercel.app/setup`
 - User authorization callback enabled
 
-Request only repository creation/template permissions needed by the app. Start
-with repository `Administration: write`, `Contents: write`, and `Metadata: read`.
-Install the app on your account for testing. Save its client ID and client secret
-in Vercel as `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`.
+In GitHub, click your avatar → **Settings** → **Developer settings** → **GitHub Apps** → **New GitHub App**. Enter the values above, enable the user authorization flow, and set these repository permissions: `Administration: write`, `Contents: write`, and `Metadata: read`. Create the app, generate a client secret on its settings page, then install the app on your account for testing.
+
+In Vercel, add `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` with the client ID and newly generated client secret. Mark the secret sensitive.
 
 Mark the source GitHub repository as a **template repository** in its GitHub
 settings. Set `GITHUB_TEMPLATE_OWNER` and `GITHUB_TEMPLATE_REPO` in Vercel.
@@ -45,9 +65,7 @@ Create an OAuth application in the Supabase partner/developer settings with:
 - App URL: `https://spending-tracker-bice-omega.vercel.app/setup`
 - Callback URL: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/supabase/callback`
 
-Request the smallest scopes that allow listing organizations and creating and
-configuring projects. Save the client ID and secret in Vercel as
-`SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`.
+Request the smallest scopes that allow listing organizations and creating and configuring projects. Save the client ID and secret in Vercel as `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`; mark the secret sensitive. Provider registration requirements can vary by Supabase partner approval status, so stop here if the dashboard asks for review rather than inventing a workaround.
 
 ### 4. Vercel integration
 
@@ -55,18 +73,11 @@ Create a Vercel integration with installation/callback URL:
 
 `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/vercel/callback`
 
-It needs permission to create projects and deployments and to write project
-environment variables. Save its slug, client ID, and secret as
-`VERCEL_INTEGRATION_SLUG`, `VERCEL_INTEGRATION_CLIENT_ID`, and
-`VERCEL_INTEGRATION_CLIENT_SECRET`.
+It needs permission to create projects and deployments and to write project environment variables. In the Vercel integration settings, copy the integration slug, client ID, and client secret into `VERCEL_INTEGRATION_SLUG`, `VERCEL_INTEGRATION_CLIENT_ID`, and `VERCEL_INTEGRATION_CLIENT_SECRET`; mark the secret sensitive.
 
 ### 5. Shared server configuration
 
-Add this production variable in Vercel:
-
-`SETUP_BASE_URL=https://spending-tracker-bice-omega.vercel.app`
-
-Apply every server-only value to Production and Preview only when the preview
+`SETUP_BASE_URL` is already covered in the first Vercel step above. Apply every provider value to Production and Preview only when the preview
 uses matching provider callback URLs. Redeploy after adding them.
 
 ## Security boundaries
