@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Category, ImportCandidate, Tracker, TrackerCollection } from '../types'
-import { filterCardCandidates, listActiveTrackers, suggestCardCategory } from './card-activity'
+import { filterCandidatesByDate, filterCardCandidates, listActiveTrackers, suggestCardCategory } from './card-activity'
 
 const candidate = {
   id: 'candidate-1',
@@ -43,6 +43,18 @@ describe('Card activity', () => {
     expect(filterCardCandidates([candidate], 'airline')).toEqual([])
     expect(filterCardCandidates([candidate], '', 'account-1')).toEqual([candidate])
     expect(filterCardCandidates([candidate], '', 'account-2')).toEqual([])
+  })
+
+  it('filters card activity by a single date or inclusive date range', () => {
+    const rows = [
+      { ...candidate, id: 'before', date: '2026-09-10' },
+      candidate,
+      { ...candidate, id: 'after', date: '2026-09-20' },
+    ]
+
+    expect(filterCandidatesByDate(rows, '2026-09-15', '2026-09-15').map((row) => row.id)).toEqual(['candidate-1'])
+    expect(filterCandidatesByDate(rows, '2026-09-11', '2026-09-20').map((row) => row.id)).toEqual(['candidate-1', 'after'])
+    expect(filterCandidatesByDate(rows, '2026-09-15').map((row) => row.id)).toEqual(['candidate-1', 'after'])
   })
 
   it('suggests a category only from the chosen tracker collection and matching kind', () => {

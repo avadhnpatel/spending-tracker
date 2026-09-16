@@ -13,6 +13,12 @@ export function filterCardCandidates(candidates: ImportCandidate[], search: stri
   ))
 }
 
+export function filterCandidatesByDate(candidates: ImportCandidate[], startDate = '', endDate = ''): ImportCandidate[] {
+  return candidates.filter((candidate) => (
+    (!startDate || candidate.date >= startDate) && (!endDate || candidate.date <= endDate)
+  ))
+}
+
 export function suggestCardCategory(candidate: ImportCandidate, tracker: Tracker, categories: Category[]): Category | null {
   const hint = candidate.category_hint.toLowerCase().replaceAll('_', ' ')
   if (!hint) return null

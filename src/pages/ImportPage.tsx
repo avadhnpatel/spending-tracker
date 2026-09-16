@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTrackers } from '../context/TrackerContext'
 import { parseCsvStatement, type CsvParseResult } from '../lib/csv'
-import { filterCardCandidates, listActiveTrackers, suggestCardCategory } from '../lib/card-activity'
+import { filterCandidatesByDate, filterCardCandidates, listActiveTrackers, suggestCardCategory } from '../lib/card-activity'
 import { formatDate, formatMoney } from '../lib/format'
 import { connectPlaid, resumePlaidRedirect, syncPlaid } from '../lib/plaid'
 import {
@@ -18,6 +18,12 @@ import type { Category, FinancialAccount, ImportCandidate, Tracker } from '../ty
 
 type ReviewChoice = { included: boolean; categoryId: string | null }
 type ReviewFilter = 'all' | 'included' | 'excluded'
+type CardDateFilter = 'all' | '30-days' | 'date' | 'range'
+
+function localDateString(date = new Date()): string {
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10)
+}
 
 export function ImportPage() {
   const { user } = useAuth()
@@ -38,6 +44,10 @@ export function ImportPage() {
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [cardSearch, setCardSearch] = useState('')
   const [cardFilter, setCardFilter] = useState('all')
+  const [cardDateFilter, setCardDateFilter] = useState<CardDateFilter>('all')
+  const [cardDate, setCardDate] = useState(localDateString())
+  const [cardStartDate, setCardStartDate] = useState('')
+  const [cardEndDate, setCardEndDate] = useState(localDateString())
   const [choosingCardId, setChoosingCardId] = useState<string | null>(null)
   const [cardTrackerId, setCardTrackerId] = useState('')
   const [cardCategoryId, setCardCategoryId] = useState('')
@@ -47,7 +57,17 @@ export function ImportPage() {
   const collectionTrackers = trackers.filter((tracker) => tracker.collection_id === selectedCollection?.id && !tracker.archived_at)
   const activeTrackers = listActiveTrackers(trackers, collections)
   const csvCandidates = candidates.filter((candidate) => candidate.provider === 'csv')
-  const visibleCardCandidates = filterCardCandidates(plaidCandidates, cardSearch, cardFilter)
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29)
+  const cardDateBounds = cardDateFilter === 'date'
+    ? { start: cardDate, end: cardDate }
+    : cardDateFilter === 'range'
+      ? { start: cardStartDate, end: cardEndDate }
+      : cardDateFilter === '30-days'
+        ? { start: localDateString(thirtyDaysAgo), end: localDateString() }
+        : { start: '', end: '' }
+  const cardAndSearchMatches = filterCardCandidates(plaidCandidates, cardSearch, cardFilter)
+  const visibleCardCandidates = filterCandidatesByDate(cardAndSearchMatches, cardDateBounds.start, cardDateBounds.end)
   const choosingCard = plaidCandidates.find((candidate) => candidate.id === choosingCardId) ?? null
   const cardTracker = activeTrackers.find((tracker) => tracker.id === cardTrackerId) ?? null
   const cardCategories = categories.filter((category) => category.collection_id === cardTracker?.collection_id && category.kind === choosingCard?.kind)
@@ -378,6 +398,36 @@ export function ImportPage() {
                 ))}
               </div>
             ) : null}
+            <div className="mt-4">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {([
+                  ['all', 'All dates'],
+                  ['30-days', 'Last 30 days'],
+                  ['date', 'Specific date'],
+                  ['range', 'Date range'],
+                ] as const).map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setCardDateFilter(value)} className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${cardDateFilter === value ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {cardDateFilter === 'date' ? (
+                <label className="mt-3 block text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Transaction date
+                  <input type="date" value={cardDate} onChange={(event) => setCardDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl bg-stone-50 px-3 text-sm text-stone-800 outline-none" />
+                </label>
+              ) : null}
+              {cardDateFilter === 'range' ? (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">From
+                    <input type="date" value={cardStartDate} max={cardEndDate || undefined} onChange={(event) => setCardStartDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl bg-stone-50 px-2 text-sm text-stone-800 outline-none" />
+                  </label>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">To
+                    <input type="date" value={cardEndDate} min={cardStartDate || undefined} onChange={(event) => setCardEndDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl bg-stone-50 px-2 text-sm text-stone-800 outline-none" />
+                  </label>
+                </div>
+              ) : null}
+            </div>
             {plaidCandidates.length > 6 ? (
               <input value={cardSearch} onChange={(event) => setCardSearch(event.target.value)} placeholder="Search card activity" className="mt-4 min-h-11 w-full rounded-xl bg-stone-50 px-3 outline-none" />
             ) : null}
