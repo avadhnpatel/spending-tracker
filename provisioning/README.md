@@ -58,12 +58,21 @@ settings. Set `GITHUB_TEMPLATE_OWNER` and `GITHUB_TEMPLATE_REPO` in Vercel.
 
 ### 3. Supabase OAuth application
 
-Create an OAuth application in the Supabase partner/developer settings with:
+This lives in your **Supabase organization settings**, not in an individual project and not in a separate partner portal.
 
-- App URL: `https://spending-tracker-bice-omega.vercel.app/setup`
-- Callback URL: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/supabase/callback`
+1. In Supabase, click your organization name in the top-left project switcher (for example, `avadhnpatel's Org`).
+2. Choose **Organization settings**.
+3. Open the **OAuth Apps** tab.
+4. Click **Add application**.
+5. Use a clear name such as `Spend Private Setup` and enter:
+   - App URL: `https://spending-tracker-bice-omega.vercel.app/setup`
+   - Redirect URI: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/supabase/callback`
+   - Client type: **Confidential**, because the token exchange runs only in our Vercel server function.
+6. Select only the scopes needed for automated project setup: Organizations (read/write), Projects (read/write), Database (write), Auth (write), Functions (write), and Secrets (write). The exact labels may differ slightly in the dashboard.
+7. Click **Create** and immediately copy the client ID and client secret. The secret may only be shown once.
+8. In Vercel → **spending-tracker** → **Settings** → **Environment Variables**, add `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`. Mark the secret sensitive and redeploy after saving.
 
-Request the smallest scopes that allow listing organizations and creating and configuring projects. Save the client ID and secret in Vercel as `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`; mark the secret sensitive. Provider registration requirements can vary by Supabase partner approval status, so stop here if the dashboard asks for review rather than inventing a workaround.
+If **OAuth Apps** is not visible in Organization settings, stop there and send a screenshot. It means the feature is not enabled for that organization or its UI has changed; do not confuse it with **Authentication → OAuth Apps**, which configures your individual project to act as an identity provider and is not what this installer needs.
 
 ### 4. Vercel integration
 
