@@ -1,3 +1,4 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { requireSupabase } from './supabase'
 
 type PlaidLinkSuccessMetadata = {
@@ -40,7 +41,16 @@ function loadPlaid(): Promise<PlaidFactory> {
 
 async function invoke<T>(name: string, body?: Record<string, unknown>): Promise<T> {
   const { data, error } = await requireSupabase().functions.invoke(name, { body })
-  if (error) throw error
+  if (error) {
+    if (error instanceof FunctionsHttpError) {
+      let response: { error?: string } | null = null
+      try {
+        response = await error.context.json() as { error?: string }
+      } catch { /* fall back to the SDK error */ }
+      if (response?.error) throw new Error(response.error)
+    }
+    throw error
+  }
   if (data?.error) throw new Error(data.error)
   return data as T
 }

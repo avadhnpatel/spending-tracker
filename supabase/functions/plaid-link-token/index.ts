@@ -19,6 +19,7 @@ Deno.serve(async (request) => {
     })
     return json({ link_token: result.link_token })
   } catch (error) {
+    console.error('Could not create Plaid link token', error)
     return json({ error: error instanceof Error ? error.message : 'Could not start Plaid Link' }, 400)
   }
 })
