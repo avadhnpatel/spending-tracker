@@ -339,3 +339,35 @@ export async function commitImportCandidate(input: {
   if (error) throw error
   return mapTransaction(data)
 }
+
+export type DataFootprint = {
+  transactionCount: number
+  importCandidateCount: number
+  dedupKeyCount: number
+  estimatedBytes: number
+}
+
+export async function getDataFootprint(): Promise<DataFootprint> {
+  const { data, error } = await requireSupabase().rpc('get_my_data_footprint').single()
+  if (error) throw error
+  const row = data as {
+    transaction_count: number | string
+    import_candidate_count: number | string
+    dedup_key_count: number | string
+    estimated_bytes: number | string
+  }
+  return {
+    transactionCount: Number(row.transaction_count),
+    importCandidateCount: Number(row.import_candidate_count),
+    dedupKeyCount: Number(row.dedup_key_count),
+    estimatedBytes: Number(row.estimated_bytes),
+  }
+}
+
+export async function purgeReviewedImportCandidates(retentionDays: number): Promise<number> {
+  const { data, error } = await requireSupabase().rpc('purge_reviewed_import_candidates', {
+    p_retention_days: retentionDays,
+  })
+  if (error) throw error
+  return Number(data)
+}
