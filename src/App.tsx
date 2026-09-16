@@ -70,11 +70,12 @@ export default function App() {
           <Route path="add" element={<AddTransactionPage />} />
           <Route path="add/:id" element={<AddTransactionPage />} />
           <Route path="insights" element={<InsightsPage />} />
+          <Route path="import" element={<ImportPage />} />
           <Route path="more" element={<MorePage />} />
           <Route path="more/trackers" element={<TrackersPage />} />
           <Route path="more/categories" element={<CategoriesPage />} />
           <Route path="more/recurring" element={<RecurringPage />} />
-          <Route path="more/import" element={<ImportPage />} />
+          <Route path="more/import" element={<Navigate to="/import" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

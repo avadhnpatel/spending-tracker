@@ -309,6 +309,18 @@ export async function listImportCandidates(): Promise<ImportCandidate[]> {
   return (data ?? []).map((row) => ({ ...row, amount: parseAmount(row.amount) }))
 }
 
+export async function listPlaidCandidates(): Promise<ImportCandidate[]> {
+  const { data, error } = await requireSupabase()
+    .from('import_candidates')
+    .select('*')
+    .eq('provider', 'plaid')
+    .neq('status', 'removed')
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((row) => ({ ...row, amount: parseAmount(row.amount) }))
+}
+
 export async function updateImportCandidate(id: string, patch: Partial<Pick<ImportCandidate, 'status' | 'imported_transaction_id'>>): Promise<void> {
   const { error } = await requireSupabase().from('import_candidates').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error

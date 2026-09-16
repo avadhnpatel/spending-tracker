@@ -73,7 +73,7 @@ export function MorePage() {
         <Row icon="◫" to="/more/trackers" label="Collections & trackers" hint="Group months, trips, and projects" />
         <Row icon="◉" to="/more/categories" label="Categories & budgets" hint="Organize spending and set targets" />
         <Row icon="↻" to="/more/recurring" label="Recurring" hint="Bills and subscriptions" />
-        <Row icon="⇩" to="/more/import" label="Import transactions" hint="CSV statements and automatic bank sync" />
+        <Row icon="⇩" to="/import" label="Import transactions" hint="CSV statements and automatic bank sync" />
       </div>
       <button
         type="button"

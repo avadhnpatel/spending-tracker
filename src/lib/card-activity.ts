@@ -5,10 +5,12 @@ export function listActiveTrackers(trackers: Tracker[], collections: TrackerColl
   return trackers.filter((tracker) => !tracker.archived_at && activeCollectionIds.has(tracker.collection_id))
 }
 
-export function filterCardCandidates(candidates: ImportCandidate[], search: string): ImportCandidate[] {
+export function filterCardCandidates(candidates: ImportCandidate[], search: string, accountId = 'all'): ImportCandidate[] {
   const query = search.trim().toLowerCase()
-  if (!query) return candidates
-  return candidates.filter((candidate) => `${candidate.merchant} ${candidate.account_name}`.toLowerCase().includes(query))
+  return candidates.filter((candidate) => (
+    (accountId === 'all' || candidate.account_id === accountId) &&
+    (!query || `${candidate.merchant} ${candidate.account_name}`.toLowerCase().includes(query))
+  ))
 }
 
 export function suggestCardCategory(candidate: ImportCandidate, tracker: Tracker, categories: Category[]): Category | null {

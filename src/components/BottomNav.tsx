@@ -39,6 +39,10 @@ export function BottomNav() {
           <ChartIcon />
           Insights
         </NavLink>
+        <NavLink to="/import" className={item}>
+          <CardIcon />
+          Import
+        </NavLink>
         <NavLink to="/more" className={item}>
           <MoreIcon />
           More
@@ -82,6 +86,15 @@ function MoreIcon() {
       <circle cx="6" cy="12" r="1.6" />
       <circle cx="12" cy="12" r="1.6" />
       <circle cx="18" cy="12" r="1.6" />
+    </svg>
+  )
+}
+
+function CardIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="5" width="18" height="14" rx="2.5" />
+      <path d="M3 9h18M7 15h4" />
     </svg>
   )
 }

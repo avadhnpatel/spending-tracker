@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTrackers } from '../context/TrackerContext'
 import { parseCsvStatement, type CsvParseResult } from '../lib/csv'
@@ -11,6 +10,7 @@ import {
   listFinancialAccounts,
   listImportCategories,
   listImportCandidates,
+  listPlaidCandidates,
   stageCsvCandidates,
   updateImportCandidate,
 } from '../lib/queries'
@@ -23,6 +23,7 @@ export function ImportPage() {
   const { user } = useAuth()
   const { collections, trackers, activeCollection, active, createTracker } = useTrackers()
   const [candidates, setCandidates] = useState<ImportCandidate[]>([])
+  const [plaidCandidates, setPlaidCandidates] = useState<ImportCandidate[]>([])
   const [accounts, setAccounts] = useState<FinancialAccount[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [collectionId, setCollectionId] = useState(activeCollection?.id ?? '')
@@ -36,6 +37,7 @@ export function ImportPage() {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>('all')
   const [confirmingImport, setConfirmingImport] = useState(false)
   const [cardSearch, setCardSearch] = useState('')
+  const [cardFilter, setCardFilter] = useState('all')
   const [choosingCardId, setChoosingCardId] = useState<string | null>(null)
   const [cardTrackerId, setCardTrackerId] = useState('')
   const [cardCategoryId, setCardCategoryId] = useState('')
@@ -44,16 +46,16 @@ export function ImportPage() {
   const selectedCollection = liveCollections.find((collection) => collection.id === collectionId) ?? liveCollections[0] ?? null
   const collectionTrackers = trackers.filter((tracker) => tracker.collection_id === selectedCollection?.id && !tracker.archived_at)
   const activeTrackers = listActiveTrackers(trackers, collections)
-  const plaidCandidates = candidates.filter((candidate) => candidate.provider === 'plaid')
   const csvCandidates = candidates.filter((candidate) => candidate.provider === 'csv')
-  const visibleCardCandidates = filterCardCandidates(plaidCandidates, cardSearch)
+  const visibleCardCandidates = filterCardCandidates(plaidCandidates, cardSearch, cardFilter)
   const choosingCard = plaidCandidates.find((candidate) => candidate.id === choosingCardId) ?? null
   const cardTracker = activeTrackers.find((tracker) => tracker.id === cardTrackerId) ?? null
   const cardCategories = categories.filter((category) => category.collection_id === cardTracker?.collection_id && category.kind === choosingCard?.kind)
 
   const refresh = useCallback(async () => {
-    const [candidateRows, accountRows] = await Promise.all([listImportCandidates(), listFinancialAccounts()])
+    const [candidateRows, plaidRows, accountRows] = await Promise.all([listImportCandidates(), listPlaidCandidates(), listFinancialAccounts()])
     setCandidates(candidateRows)
+    setPlaidCandidates(plaidRows)
     setAccounts(accountRows)
   }, [])
 
@@ -312,9 +314,8 @@ export function ImportPage() {
   return (
     <div className="space-y-5 pb-6">
       <div>
-        <Link to="/more" className="text-sm font-medium text-teal-800">← More</Link>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Import transactions</h1>
-        <p className="mt-1 text-sm text-stone-500">Review every charge before it enters a tracker.</p>
+        <h1 className="text-3xl font-semibold tracking-tight">Import</h1>
+        <p className="mt-1 text-sm text-stone-500">Card activity, bank sync, and statement imports.</p>
       </div>
 
       <section className="rounded-3xl bg-white p-4 shadow-sm">
@@ -367,10 +368,20 @@ export function ImportPage() {
               </div>
               <button type="button" disabled={busy || !accounts.length} onClick={() => void syncBank()} className="min-h-10 shrink-0 rounded-xl bg-stone-100 px-3 text-sm font-semibold text-teal-800 disabled:opacity-50">Sync</button>
             </div>
+            {accounts.length ? (
+              <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+                <button type="button" onClick={() => setCardFilter('all')} className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${cardFilter === 'all' ? 'bg-teal-800 text-white' : 'bg-stone-100 text-stone-600'}`}>All cards</button>
+                {accounts.map((account) => (
+                  <button key={account.id} type="button" onClick={() => setCardFilter(account.provider_account_id)} className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${cardFilter === account.provider_account_id ? 'bg-teal-800 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                    {account.name}{account.mask ? ` •${account.mask}` : ''}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             {plaidCandidates.length > 6 ? (
               <input value={cardSearch} onChange={(event) => setCardSearch(event.target.value)} placeholder="Search card activity" className="mt-4 min-h-11 w-full rounded-xl bg-stone-50 px-3 outline-none" />
             ) : null}
-            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-stone-400">{plaidCandidates.length} waiting</p>
+            <p className="mt-3 text-xs font-medium uppercase tracking-wide text-stone-400">{visibleCardCandidates.length} of {plaidCandidates.length} transactions</p>
           </div>
 
           {visibleCardCandidates.map((candidate) => (
@@ -383,15 +394,20 @@ export function ImportPage() {
                 <p className={`shrink-0 font-semibold ${candidate.kind === 'income' ? 'text-emerald-700' : ''}`}>{candidate.kind === 'income' ? '+' : ''}{formatMoney(candidate.amount)}</p>
               </div>
               <div className="mt-2 flex gap-1.5">
+                <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${candidate.status === 'imported' ? 'bg-emerald-50 text-emerald-700' : candidate.status === 'excluded' ? 'bg-stone-200 text-stone-600' : 'bg-teal-50 text-teal-800'}`}>
+                  {candidate.status === 'imported' ? 'Added' : candidate.status === 'excluded' ? 'Skipped' : 'Ready to add'}
+                </span>
                 {candidate.pending ? <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800">Pending</span> : null}
                 {candidate.category_hint ? <span className="rounded-full bg-stone-100 px-2 py-1 text-[11px] font-medium capitalize text-stone-500">{candidate.category_hint.toLowerCase().replaceAll('_', ' ')}</span> : null}
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button type="button" disabled={busy || !active} onClick={() => active && void addCardTransaction(candidate, active)} className="min-h-12 rounded-xl bg-teal-800 px-3 text-sm font-semibold text-white disabled:opacity-50">
-                  {active ? `Add to ${active.name}` : 'No current tracker'}
-                </button>
-                <button type="button" disabled={busy || !activeTrackers.length} onClick={() => openTrackerPicker(candidate)} className="min-h-12 rounded-xl bg-stone-100 px-3 text-sm font-semibold text-stone-700 disabled:opacity-50">Choose tracker</button>
-              </div>
+              {candidate.status === 'pending' ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button type="button" disabled={busy || !active} onClick={() => active && void addCardTransaction(candidate, active)} className="min-h-12 rounded-xl bg-teal-800 px-3 text-sm font-semibold text-white disabled:opacity-50">
+                    {active ? `Add to ${active.name}` : 'No current tracker'}
+                  </button>
+                  <button type="button" disabled={busy || !activeTrackers.length} onClick={() => openTrackerPicker(candidate)} className="min-h-12 rounded-xl bg-stone-100 px-3 text-sm font-semibold text-stone-700 disabled:opacity-50">Choose tracker</button>
+                </div>
+              ) : null}
             </article>
           ))}
 

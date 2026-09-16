@@ -107,6 +107,10 @@ html.dark .bg-teal-50 {
   background-color: rgb(19 78 74 / 38%);
 }
 
+html.dark .bg-emerald-50 {
+  background-color: rgb(6 78 59 / 38%);
+}
+
 html.dark .border-teal-100 {
   border-color: rgb(19 78 74 / 75%);
 }

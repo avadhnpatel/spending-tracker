@@ -41,6 +41,8 @@ describe('Card activity', () => {
     expect(filterCardCandidates([candidate], 'coffee')).toEqual([candidate])
     expect(filterCardCandidates([candidate], 'venture')).toEqual([candidate])
     expect(filterCardCandidates([candidate], 'airline')).toEqual([])
+    expect(filterCardCandidates([candidate], '', 'account-1')).toEqual([candidate])
+    expect(filterCardCandidates([candidate], '', 'account-2')).toEqual([])
   })
 
   it('suggests a category only from the chosen tracker collection and matching kind', () => {
