@@ -67,20 +67,36 @@ This lives in your **Supabase organization settings**, not in an individual proj
 5. Use a clear name such as `Spend Private Setup` and enter:
    - App URL: `https://spending-tracker-bice-omega.vercel.app/setup`
    - Redirect URI: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/supabase/callback`
-   - Client type: **Confidential**, because the token exchange runs only in our Vercel server function.
-6. Select only the scopes needed for automated project setup: Organizations (read/write), Projects (read/write), Database (write), Auth (write), Functions (write), and Secrets (write). The exact labels may differ slightly in the dashboard.
-7. Click **Create** and immediately copy the client ID and client secret. The secret may only be shown once.
-8. In Vercel → **spending-tracker** → **Settings** → **Environment Variables**, add `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`. Mark the secret sensitive and redeploy after saving.
+6. The current dashboard does not show a separate client-type setting. That is expected; the client secret it generates is used only by our Vercel server function.
+7. Select only the scopes needed for automated project setup: Organizations (read), Projects (read/write), Database (write), Auth (write), Edge Functions (write), Secrets (read/write), and Storage (write). Leave the other scopes at **No access**.
+8. Click **Create** and immediately copy the client ID and client secret. The secret may only be shown once.
+9. In Vercel → **spending-tracker** → **Settings** → **Environment Variables**, add `SUPABASE_OAUTH_CLIENT_ID` and `SUPABASE_OAUTH_CLIENT_SECRET`. Mark the secret sensitive and redeploy after saving.
 
 If **OAuth Apps** is not visible in Organization settings, stop there and send a screenshot. It means the feature is not enabled for that organization or its UI has changed; do not confuse it with **Authentication → OAuth Apps**, which configures your individual project to act as an identity provider and is not what this installer needs.
 
 ### 4. Vercel integration
 
-Create a Vercel integration with installation/callback URL:
+This is separate from the **Integrations** page inside the spending-tracker project. Open the Vercel dashboard, select your account in the team switcher, click **Integrations**, then click **Integrations Console** in the top-right and choose **Create**. Select a **connectable account integration**; do not create a Native integration or a Marketplace product.
 
-`https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/vercel/callback`
+Use these values in the form:
 
-It needs permission to create projects and deployments and to write project environment variables. In the Vercel integration settings, copy the integration slug, client ID, and client secret into `VERCEL_INTEGRATION_SLUG`, `VERCEL_INTEGRATION_CLIENT_ID`, and `VERCEL_INTEGRATION_CLIENT_SECRET`; mark the secret sensitive.
+- Name: `Spend Private Setup`
+- URL slug: `spend-private-setup` (or a unique variation if already taken)
+- Website: `https://spending-tracker-bice-omega.vercel.app/setup`
+- Documentation URL: `https://spending-tracker-bice-omega.vercel.app/setup`
+- Privacy policy URL: `https://spending-tracker-bice-omega.vercel.app/privacy`
+- Terms/EULA URL: `https://spending-tracker-bice-omega.vercel.app/terms`
+- Redirect URL: `https://spending-tracker-bice-omega.vercel.app/api/setup/oauth/vercel/callback`
+- Configuration URL: `https://spending-tracker-bice-omega.vercel.app/setup`
+- Webhook URL: leave blank
+
+For API scopes, select only: `user` (read), `team` (read), `project` (read/write), `project-env-vars` (read/write), `deployment` (read/write), and `integration-configuration` (read/write). Do not request domains, billing, logs, Edge Config, or global project environment variables.
+
+The Redirect URL is the installer endpoint. Vercel sends a short-lived code there after a friend approves the integration; our server exchanges it for a token and then creates their project and deployment.
+
+After the integration is created, open its settings in the Integration Console. At the bottom, under **Credentials**, copy the client ID and client secret. Its URL slug is the value entered above.
+
+In Vercel → **spending-tracker** → **Settings** → **Environment Variables**, add `VERCEL_INTEGRATION_SLUG`, `VERCEL_INTEGRATION_CLIENT_ID`, and `VERCEL_INTEGRATION_CLIENT_SECRET`; mark the secret sensitive and redeploy after saving.
 
 ### 5. Shared server configuration
 

@@ -36,6 +36,12 @@ const RecurringPage = lazy(() =>
 const SetupPage = lazy(() =>
   import('./pages/SetupPage').then((module) => ({ default: module.SetupPage })),
 )
+const PrivacyPage = lazy(() =>
+  import('./pages/PrivacyPage').then((module) => ({ default: module.PrivacyPage })),
+)
+const TermsPage = lazy(() =>
+  import('./pages/PrivacyPage').then((module) => ({ default: module.TermsPage })),
+)
 const TrackersPage = lazy(() =>
   import('./pages/TrackersPage').then((module) => ({ default: module.TrackersPage })),
 )
@@ -68,6 +74,8 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/setup" element={<SetupPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route element={<ProtectedApp />}>
           <Route index element={<HomePage />} />
           <Route path="activity" element={<ActivityPage />} />
