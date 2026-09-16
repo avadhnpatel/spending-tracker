@@ -29,7 +29,7 @@ body {
 }
 
 .bottom-nav {
-  background: rgb(244 241 236 / 95%);
+  background: rgb(255 255 255 / 88%);
 }
 
 .tracker-select {
@@ -60,6 +60,7 @@ textarea:focus-visible {
 
 .nav-item.is-active {
   color: var(--tracker-color, #0f766e);
+  background: color-mix(in srgb, var(--tracker-color, #0f766e) 11%, transparent);
 }
 
 ::selection {
@@ -78,7 +79,8 @@ html.dark .app-header {
 }
 
 html.dark .bottom-nav {
-  background: rgb(12 10 9 / 94%);
+  background: rgb(28 25 23 / 90%);
+  border-color: rgb(87 83 78 / 65%);
 }
 
 html.dark .tracker-select {

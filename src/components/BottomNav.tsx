@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useTrackers } from '../context/TrackerContext'
 
 const item = ({ isActive }: { isActive: boolean }) =>
-  `nav-item flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-medium ${
+  `nav-item flex min-h-[3.25rem] flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl py-1 text-[10px] font-semibold transition ${
     isActive ? 'is-active' : 'text-stone-500'
   }`
 
@@ -10,43 +10,40 @@ export function BottomNav() {
   const { active } = useTrackers()
 
   return (
-    <nav
-      className="bottom-nav fixed right-0 bottom-0 left-0 z-20 border-t border-stone-200/80 backdrop-blur-md"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      <div className="mx-auto flex max-w-lg items-end px-2 pt-1">
-        <NavLink to="/" end className={item}>
-          <HomeIcon />
-          Home
-        </NavLink>
-        <NavLink to="/activity" className={item}>
-          <ListIcon />
-          Activity
-        </NavLink>
+    <nav className="fixed right-0 bottom-0 left-0 z-20 pointer-events-none">
+      <div className="relative mx-auto max-w-lg px-3" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
         <NavLink
           to="/add"
-          className="relative -top-3 flex flex-col items-center text-[11px] font-medium text-teal-900"
+          className="pointer-events-auto absolute -top-7 right-5 z-10 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-lg transition active:scale-95"
+          style={{ backgroundColor: active?.color ?? '#0f766e', boxShadow: `0 9px 22px ${active?.color ?? '#0f766e'}55` }}
           aria-label="Add transaction"
         >
-          <span
-            className="flex h-14 w-14 items-center justify-center rounded-full text-3xl leading-none text-white shadow-lg transition active:scale-95"
-            style={{ backgroundColor: active?.color ?? '#0f766e', boxShadow: `0 10px 24px ${active?.color ?? '#0f766e'}40` }}
-          >
+          <span className="text-[1.75rem] leading-none" aria-hidden="true">
             +
           </span>
         </NavLink>
-        <NavLink to="/insights" className={item}>
-          <ChartIcon />
-          Insights
-        </NavLink>
-        <NavLink to="/import" className={item}>
-          <CardIcon />
-          Import
-        </NavLink>
-        <NavLink to="/more" className={item}>
-          <MoreIcon />
-          More
-        </NavLink>
+        <div className="bottom-nav pointer-events-auto grid grid-cols-5 gap-1 rounded-[1.4rem] border border-white/70 p-1.5 shadow-[0_12px_35px_rgba(28,25,23,0.14)] backdrop-blur-xl">
+          <NavLink to="/" end className={item}>
+            <HomeIcon />
+            Home
+          </NavLink>
+          <NavLink to="/activity" className={item}>
+            <ListIcon />
+            Activity
+          </NavLink>
+          <NavLink to="/insights" className={item}>
+            <ChartIcon />
+            Insights
+          </NavLink>
+          <NavLink to="/import" className={item}>
+            <CardIcon />
+            Import
+          </NavLink>
+          <NavLink to="/more" className={item}>
+            <MoreIcon />
+            More
+          </NavLink>
+        </div>
       </div>
     </nav>
   )

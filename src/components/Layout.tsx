@@ -12,12 +12,11 @@ export function Layout() {
       style={{
         '--tracker-color': active?.color ?? '#0f766e',
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'calc(5.75rem + env(safe-area-inset-bottom))',
+        paddingBottom: 'calc(6.25rem + env(safe-area-inset-bottom))',
       } as React.CSSProperties}
     >
-      <header className="app-header sticky top-0 z-10 flex items-center justify-between px-4 pt-3 pb-3 backdrop-blur-xl">
+      <header className="app-header sticky top-0 z-10 px-3 py-2 backdrop-blur-xl">
         <TrackerSwitcher />
-        <span className="text-xs font-bold tracking-[0.16em] text-stone-400 uppercase">Spend</span>
       </header>
       <main className="px-4">
         <Outlet />
