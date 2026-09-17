@@ -65,12 +65,26 @@ export async function listSupabaseOrganizations(session: SetupSession): Promise<
 }
 
 export async function createSupabaseProject(session: SetupSession, organizationSlug: string, name: string, regionGroup: SupabaseRegionGroup) {
-  const dbPass = `${crypto.randomUUID()}Aa1!`
-  return providerRequest<{ ref: string; name: string }>('https://api.supabase.com/v1/projects', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${supabaseToken(session)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(supabaseProjectBody(organizationSlug, name, dbPass, regionGroup)),
+  const projects = await providerRequest<Array<{ ref: string; name: string }>>('https://api.supabase.com/v1/projects', {
+    headers: { Authorization: `Bearer ${supabaseToken(session)}` },
   })
+  const existing = projects.find((project) => project.name === name)
+  if (existing) return existing
+
+  const dbPass = `${crypto.randomUUID()}Aa1!`
+  try {
+    return await providerRequest<{ ref: string; name: string }>('https://api.supabase.com/v1/projects', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${supabaseToken(session)}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(supabaseProjectBody(organizationSlug, name, dbPass, regionGroup)),
+    })
+  } catch (error) {
+    const recovered = (await providerRequest<Array<{ ref: string; name: string }>>('https://api.supabase.com/v1/projects', {
+      headers: { Authorization: `Bearer ${supabaseToken(session)}` },
+    })).find((project) => project.name === name)
+    if (recovered) return recovered
+    throw error
+  }
 }
 
 export async function applySpendSchema(session: SetupSession): Promise<void> {
@@ -94,21 +108,26 @@ export async function getSupabasePublishableKey(session: SetupSession): Promise<
   return key
 }
 
-const functionSlugs = ['plaid-link-token', 'plaid-exchange', 'plaid-sync'] as const
+export const spendFunctionSlugs = ['plaid-link-token', 'plaid-exchange', 'plaid-sync'] as const
+export type SpendFunctionSlug = typeof spendFunctionSlugs[number]
 
-export async function deploySpendFunctions(session: SetupSession): Promise<void> {
+export async function deploySpendFunction(session: SetupSession, slug: SpendFunctionSlug): Promise<void> {
   if (!session.supabase_project_ref) throw new Error('Supabase project is missing')
   const sharedFiles = ['http.ts', 'plaid.ts', 'supabase.ts']
-  for (const slug of functionSlugs) {
-    const form = new FormData()
-    form.append('metadata', JSON.stringify({ entrypoint_path: `${slug}/index.ts`, name: slug, verify_jwt: true }))
-    form.append('file', new Blob([await readFile(join(process.cwd(), `supabase/functions/${slug}/index.ts`))]), `${slug}/index.ts`)
-    for (const filename of sharedFiles) {
-      form.append('file', new Blob([await readFile(join(process.cwd(), `supabase/functions/_shared/${filename}`))]), `_shared/${filename}`)
-    }
-    await providerRequest(`https://api.supabase.com/v1/projects/${session.supabase_project_ref}/functions/deploy?slug=${slug}`, {
-      method: 'POST', headers: { Authorization: `Bearer ${supabaseToken(session)}` }, body: form,
-    })
+  const form = new FormData()
+  form.append('metadata', JSON.stringify({ entrypoint_path: `${slug}/index.ts`, name: slug, verify_jwt: true }))
+  form.append('file', new Blob([await readFile(join(process.cwd(), `supabase/functions/${slug}/index.ts`))]), `${slug}/index.ts`)
+  for (const filename of sharedFiles) {
+    form.append('file', new Blob([await readFile(join(process.cwd(), `supabase/functions/_shared/${filename}`))]), `_shared/${filename}`)
+  }
+  await providerRequest(`https://api.supabase.com/v1/projects/${session.supabase_project_ref}/functions/deploy?slug=${slug}`, {
+    method: 'POST', headers: { Authorization: `Bearer ${supabaseToken(session)}` }, body: form,
+  })
+}
+
+export async function deploySpendFunctions(session: SetupSession): Promise<void> {
+  for (const slug of spendFunctionSlugs) {
+    await deploySpendFunction(session, slug)
   }
 }
 

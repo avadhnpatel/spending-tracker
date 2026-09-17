@@ -16,3 +16,9 @@ export function supabaseProjectBody(organizationSlug: string, name: string, dbPa
     region_selection: { type: 'smartGroup', code: regionGroup },
   }
 }
+
+export function resumableSupabaseProjectName(requestedName: string, sessionId: string): string {
+  const base = requestedName.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'spend-private'
+  const suffix = sessionId.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)
+  return suffix ? `${base}-${suffix}` : base
+}

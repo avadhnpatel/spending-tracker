@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type SetupSession = {
   id: string
   status: string
   connections: { github: boolean; supabase: boolean; vercel: boolean }
-  githubLogin: string | null
-  repository: string | null
   supabaseProjectRef: string | null
-  vercelProjectId: string | null
   deploymentUrl: string | null
   mobileHandoff: boolean
   error: string | null
@@ -32,7 +29,6 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export function SetupPage() {
   const [session, setSession] = useState<SetupSession | null>(null)
-  const [repositoryName, setRepositoryName] = useState('spend-private')
   const [busy, setBusy] = useState(false)
   const [organizations, setOrganizations] = useState<SupabaseOrganization[]>([])
   const [organizationSlug, setOrganizationSlug] = useState('')
@@ -43,8 +39,7 @@ export function SetupPage() {
   useEffect(() => {
     async function load() {
       try {
-        const response = await fetch('/api/setup/session')
-        setSession(await readJson<SetupSession>(response))
+        setSession(await readJson<SetupSession>(await fetch('/api/setup/session')))
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not start setup')
       }
@@ -53,46 +48,27 @@ export function SetupPage() {
   }, [])
 
   useEffect(() => {
-    if (session?.status !== 'complete' || !session.mobileHandoff) return
-    window.location.assign(`spend://setup/complete?session=${encodeURIComponent(session.id)}`)
+    if (session?.status !== 'complete') return
+    if (session.mobileHandoff) {
+      window.location.assign(`spend://setup/complete?session=${encodeURIComponent(session.id)}`)
+    } else {
+      window.location.replace('/account')
+    }
   }, [session?.id, session?.mobileHandoff, session?.status])
 
-  const completed = useMemo(() => {
-    if (!session) return 0
-    return Number(session.connections.github) + Number(Boolean(session.repository)) + Number(session.connections.supabase) + Number(session.connections.vercel)
-  }, [session])
-
   useEffect(() => {
-    if (completed !== 4 || session?.status === 'complete') return
+    if (!session?.connections.supabase || session.status === 'complete') return
     async function loadOptions() {
       try {
         const result = await readJson<{ organizations: SupabaseOrganization[] }>(await fetch('/api/setup/options'))
         setOrganizations(result.organizations)
         setOrganizationSlug((current) => current || result.organizations[0]?.slug || '')
-        if (session?.repository) setProjectName(session.repository.split('/')[1] || 'spend-private')
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not load Supabase organizations')
       }
     }
     void loadOptions()
-  }, [completed, session?.repository, session?.status])
-
-  async function createRepository() {
-    setBusy(true)
-    setError(null)
-    try {
-      const response = await fetch('/api/setup/github/repository', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: repositoryName }),
-      })
-      setSession(await readJson<SetupSession>(response))
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create the repository')
-    } finally {
-      setBusy(false)
-    }
-  }
+  }, [session?.connections.supabase, session?.status])
 
   async function provision() {
     setBusy(true)
@@ -106,7 +82,7 @@ export function SetupPage() {
       const next = await readJson<SetupSession>(response)
       setSession(next)
       if (response.status === 202) {
-        window.setTimeout(() => void provision(), next.status === 'configuring_supabase' ? 15000 : 4000)
+        window.setTimeout(() => void provision(), 4000)
         return
       }
       setBusy(false)
@@ -116,24 +92,26 @@ export function SetupPage() {
     }
   }
 
+  const connected = Boolean(session?.connections.supabase)
+
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))] sm:px-6">
       <header className="mb-7">
         <a href="/" className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-800">← Back to Spend</a>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.28em] text-teal-700">Private Spend setup</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Your own app, without the technical setup.</h1>
-        <p className="mt-3 max-w-xl leading-7 text-stone-500">Connect three free services. Spend creates a private copy with its own database, deployment, and data limits.</p>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Your data, in a project you own.</h1>
+        <p className="mt-3 max-w-xl leading-7 text-stone-500">Connect Supabase once. Spend creates your private database and sign-in system, while the app continues to run securely at spendingtrkr.com.</p>
       </header>
 
       <section className="mb-5 rounded-3xl bg-stone-900 p-5 text-white shadow-xl shadow-stone-900/10">
         <div className="flex items-center justify-between text-sm">
           <span className="font-semibold">Setup progress</span>
-          <span className="text-stone-300">{completed} of 4</span>
+          <span className="text-stone-300">{connected ? 1 : 0} of 1</span>
         </div>
-        <div className="mt-3 grid grid-cols-4 gap-2" aria-label={`${completed} of 4 setup steps complete`}>
-          {[0, 1, 2, 3].map((step) => <span key={step} className={`h-2 rounded-full ${step < completed ? 'bg-teal-400' : 'bg-stone-700'}`} />)}
+        <div className="mt-3 h-2 rounded-full bg-stone-700" aria-label={`${connected ? 1 : 0} of 1 setup steps complete`}>
+          <span className={`block h-full rounded-full ${connected ? 'w-full bg-teal-400' : 'w-0'}`} />
         </div>
-        <p className="mt-3 text-sm text-stone-300">This session expires in two hours. Access tokens are encrypted and removed after provisioning.</p>
+        <p className="mt-3 text-sm text-stone-300">Your temporary Supabase access token is encrypted and removed when setup finishes.</p>
       </section>
 
       {error ? <div className="mb-4 rounded-2xl bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</div> : null}
@@ -141,37 +119,14 @@ export function SetupPage() {
 
       {session ? (
         <div className="space-y-3">
-          <SetupStep number="1" title="Connect GitHub" description="Authorize once so Spend can create and deploy your private repository. GitHub's repo permission also grants access to your other private repositories; the token is encrypted temporarily and deleted when setup finishes." done={session.connections.github}>
-            {session.connections.github ? <Status text={`Connected as ${session.githubLogin}`} /> : <ConnectButton href="/api/setup/oauth/github/start" label="Connect GitHub" />}
+          <SetupStep title="Connect Supabase" description="Supabase holds your private financial data and authentication. Spend receives temporary permission only to create and configure your project." done={connected}>
+            {connected ? <Status text="Supabase connected" /> : <ConnectButton href="/api/setup/oauth/supabase/start" label="Connect Supabase" />}
           </SetupStep>
 
-          <SetupStep number="2" title="Create your private repository" description="We copy the Spend template into a new private repository that you own." done={Boolean(session.repository)} locked={!session.connections.github}>
-            {session.repository ? <Status text={session.repository} /> : (
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <label className="sr-only" htmlFor="repository-name">Repository name</label>
-                <input id="repository-name" value={repositoryName} onChange={(event) => setRepositoryName(event.target.value)} disabled={!session.connections.github || busy} className="min-h-12 min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-4 text-base disabled:opacity-50" autoCapitalize="none" spellCheck={false} />
-                <button type="button" onClick={() => void createRepository()} disabled={!session.connections.github || busy || !repositoryName.trim()} className="min-h-12 rounded-xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-40">{busy ? 'Creating…' : 'Create private repo'}</button>
-              </div>
-            )}
-          </SetupStep>
-
-          <SetupStep number="3" title="Connect Supabase" description="Supabase provides your private database and sign-in system." done={session.connections.supabase} locked={!session.repository}>
-            {session.connections.supabase ? <Status text="Supabase connected" /> : <ConnectButton href="/api/setup/oauth/supabase/start" label="Connect Supabase" disabled={!session.repository} />}
-          </SetupStep>
-
-          <SetupStep number="4" title="Connect Vercel" description="Vercel publishes your app at a secure web address." done={session.connections.vercel} locked={!session.connections.supabase}>
-            {session.connections.vercel ? <Status text="Vercel connected" /> : (
-              <div>
-                <p className="mb-3 text-sm leading-6 text-stone-600">Vercel opens in a new tab. After signing in, click <strong>Add Integration</strong>, choose your Vercel account, then click <strong>Install</strong>. Vercel will return you to Spend automatically.</p>
-                <ConnectButton href="/api/setup/oauth/vercel/start" label="Continue to Vercel" disabled={!session.connections.supabase} newTab />
-              </div>
-            )}
-          </SetupStep>
-
-          {completed === 4 && session.status !== 'complete' ? (
+          {connected && session.status !== 'complete' ? (
             <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
-              <p className="font-semibold text-teal-950">Create your private Spend app</p>
-              <p className="mt-1 text-sm leading-6 text-teal-900">Choose where the private database should live. Setup usually takes two to four minutes and can be retried safely.</p>
+              <p className="font-semibold text-teal-950">Create your private Spend database</p>
+              <p className="mt-1 text-sm leading-6 text-teal-900">Choose its location. Setup is resumable and usually takes a few minutes.</p>
               <div className="mt-4 space-y-3">
                 <label className="block text-sm font-semibold text-teal-950">Supabase organization
                   <select value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">
@@ -192,47 +147,35 @@ export function SetupPage() {
               </div>
             </section>
           ) : null}
-
-          {session.status === 'complete' && session.deploymentUrl ? (
-            <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
-              <p className="font-semibold text-teal-950">Your private Spend app is ready.</p>
-              <p className="mt-1 text-sm leading-6 text-teal-900">The temporary provider tokens have been removed from the installer.</p>
-              {session.mobileHandoff ? <p className="mt-4 text-sm font-semibold text-teal-900">Returning to Spend…</p> : <a href={session.deploymentUrl} className="mt-4 inline-flex min-h-12 items-center rounded-xl bg-teal-800 px-5 font-semibold text-white">Open my Spend app →</a>}
-            </section>
-          ) : null}
         </div>
       ) : null}
 
-      <p className="mt-7 text-center text-xs leading-5 text-stone-500">Your financial data stays in the Supabase project you own. Plaid is connected later inside your deployed Spend app.</p>
+      <p className="mt-7 text-center text-xs leading-5 text-stone-500">Your financial data stays in the Supabase project you own. Plaid is connected later inside Spend.</p>
     </main>
   )
 }
 
 function setupStatusLabel(status: string): string {
-  if (status === 'creating_supabase') return 'Creating Supabase project…'
-  if (status === 'configuring_supabase') return 'Configuring database…'
-  if (status === 'linking_vercel') return 'Linking your repository…'
-  if (status === 'deploying') return 'Deploying to Vercel…'
+  if (status === 'connecting' || status === 'ready_to_provision' || status === 'creating_supabase') return 'Creating Supabase project…'
+  if (status === 'applying_schema' || status === 'configuring_supabase') return 'Configuring database…'
+  if (status.startsWith('deploying_plaid')) return 'Installing secure functions…'
+  if (status === 'reading_supabase_key' || status === 'configuring_auth') return 'Finishing setup…'
   return 'Working…'
 }
 
-function SetupStep({ number, title, description, done, locked = false, children }: { number: string; title: string; description: string; done: boolean; locked?: boolean; children: React.ReactNode }) {
+function SetupStep({ title, description, done, children }: { title: string; description: string; done: boolean; children: React.ReactNode }) {
   return (
-    <section className={`rounded-3xl bg-white p-5 shadow-sm transition ${locked ? 'opacity-55' : ''}`}>
+    <section className="rounded-3xl bg-white p-5 shadow-sm">
       <div className="flex gap-4">
-        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl font-bold ${done ? 'bg-teal-700 text-white' : 'bg-stone-100 text-stone-500'}`}>{done ? '✓' : number}</span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <p className="mt-1 text-sm leading-6 text-stone-500">{description}</p>
-          <div className="mt-4">{children}</div>
-        </div>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl font-bold ${done ? 'bg-teal-700 text-white' : 'bg-stone-100 text-stone-500'}`}>{done ? '✓' : '1'}</span>
+        <div className="min-w-0 flex-1"><h2 className="text-lg font-semibold">{title}</h2><p className="mt-1 text-sm leading-6 text-stone-500">{description}</p><div className="mt-4">{children}</div></div>
       </div>
     </section>
   )
 }
 
-function ConnectButton({ href, label, disabled = false, newTab = false }: { href: string; label: string; disabled?: boolean; newTab?: boolean }) {
-  return disabled ? <button type="button" disabled className="min-h-12 rounded-xl bg-stone-100 px-5 font-semibold text-stone-400">{label}</button> : <a href={href} target={newTab ? '_blank' : undefined} rel={newTab ? 'noopener' : undefined} className="inline-flex min-h-12 items-center rounded-xl bg-stone-900 px-5 font-semibold text-white">{label} →</a>
+function ConnectButton({ href, label }: { href: string; label: string }) {
+  return <a href={href} className="inline-flex min-h-12 items-center rounded-xl bg-stone-900 px-5 font-semibold text-white">{label} →</a>
 }
 
 function Status({ text }: { text: string }) {

@@ -35,7 +35,7 @@ After `npx cap add ios`, add the `spend` URL scheme to the target's URL Types in
 This supports both:
 
 - `spend://auth/callback` for Supabase magic-link sign-in
-- `spend://setup/complete` for the private GitHub/Supabase/Vercel setup handoff
+- `spend://setup/complete` for the private Supabase setup handoff
 
 For the production release, also register the app's associated domain and replace the setup
 handoff with a Universal Link. The custom scheme is retained as a development fallback.

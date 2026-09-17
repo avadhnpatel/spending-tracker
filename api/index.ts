@@ -1,15 +1,10 @@
 import directoryMe from '../server/directory/me.js'
 import directoryStartSetup from '../server/directory/start-setup.js'
-import githubRepository from '../server/setup/github/repository.js'
 import mobileActivate from '../server/setup/mobile/activate.js'
 import mobileClaim from '../server/setup/mobile/claim.js'
 import mobileStart from '../server/setup/mobile/start.js'
-import githubCallback from '../server/setup/oauth/github/callback.js'
-import githubStart from '../server/setup/oauth/github/start.js'
 import supabaseCallback from '../server/setup/oauth/supabase/callback.js'
 import supabaseStart from '../server/setup/oauth/supabase/start.js'
-import vercelCallback from '../server/setup/oauth/vercel/callback.js'
-import vercelStart from '../server/setup/oauth/vercel/start.js'
 import options from '../server/setup/options.js'
 import provision from '../server/setup/provision.js'
 import session from '../server/setup/session.js'
@@ -23,16 +18,11 @@ const routes: Record<string, Handler> = {
   'setup/session': session,
   'setup/options': options,
   'setup/provision': provision,
-  'setup/github/repository': githubRepository,
   'setup/mobile/activate': mobileActivate,
   'setup/mobile/claim': mobileClaim,
   'setup/mobile/start': mobileStart,
-  'setup/oauth/github/start': githubStart,
-  'setup/oauth/github/callback': githubCallback,
   'setup/oauth/supabase/start': supabaseStart,
   'setup/oauth/supabase/callback': supabaseCallback,
-  'setup/oauth/vercel/start': vercelStart,
-  'setup/oauth/vercel/callback': vercelCallback,
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {

@@ -1,59 +1,64 @@
-import { allowMethods, publicError } from '../_lib/http.js'
-import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, getSupabasePublishableKey, linkVercelRepository } from '../_lib/providers.js'
-import { publicSession, savePrivateApp, sessionFromRequest, updateSession } from '../_lib/store.js'
-import { parseSupabaseRegionGroup } from '../_lib/supabase-project.js'
+import { allowMethods, publicError, setupBaseUrl } from '../_lib/http.js'
+import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, deploySpendFunction, getSupabasePublishableKey } from '../_lib/providers.js'
+import { claimProvisioningStep, finishProvisioningStep, publicSession, savePrivateApp, sessionFromRequest } from '../_lib/store.js'
+import { parseSupabaseRegionGroup, resumableSupabaseProjectName } from '../_lib/supabase-project.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
 
 type Input = { organizationSlug?: string; projectName?: string; regionGroup?: string }
 
 function ready(session: SetupSession): boolean {
-  return Boolean(session.repository_full_name && session.github_token_encrypted && session.supabase_token_encrypted && session.vercel_token_encrypted)
+  return Boolean(session.supabase_token_encrypted)
+}
+
+function normalizedStep(session: SetupSession, claimedStep: string): string {
+  if (!session.supabase_project_ref) return 'ready_to_provision'
+  if (claimedStep === 'connecting' || claimedStep === 'creating_supabase') return 'applying_schema'
+  if (['configuring_supabase', 'linking_vercel', 'deploying'].includes(claimedStep)) return 'applying_schema'
+  return claimedStep
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (!allowMethods(request, response, ['POST'])) return
   let session = await sessionFromRequest(request)
-  if (!session || !ready(session)) return response.status(409).json({ error: 'Connect all three services and create the repository first' })
+  if (!session || !ready(session)) return response.status(409).json({ error: 'Connect Supabase first' })
+  if (session.status === 'complete') return response.status(200).json(publicSession(session))
+
+  const claim = await claimProvisioningStep(session)
+  if (!claim) return response.status(202).json(publicSession(session))
+
+  const step = normalizedStep(claim.session, claim.step)
   try {
     const input = (request.body ?? {}) as Input
-    if (!session.supabase_project_ref) {
+    if (step === 'ready_to_provision') {
       const organizationSlug = input.organizationSlug?.trim()
-      const projectName = input.projectName?.trim() || session.repository_full_name!.split('/')[1]!
-      if (!organizationSlug) return response.status(400).json({ error: 'Choose a Supabase organization' })
-      session = await updateSession(session.id, { status: 'creating_supabase', error_message: null })
-      const project = await createSupabaseProject(session, organizationSlug, projectName, parseSupabaseRegionGroup(input.regionGroup))
-      session = await updateSession(session.id, { supabase_project_ref: project.ref, status: 'configuring_supabase' })
-      return response.status(202).json(publicSession(session))
-    }
-
-    if (!session.vercel_project_id) {
-      session = await updateSession(session.id, { status: 'configuring_supabase', error_message: null })
-      await applySpendSchema(session)
-      await deploySpendFunctions(session)
-      const publishableKey = await getSupabasePublishableKey(session)
-      const project = await createVercelProject(session, publishableKey)
-      session = await updateSession(session.id, { vercel_project_id: project.id, supabase_publishable_key: publishableKey, status: 'linking_vercel' })
-      return response.status(202).json(publicSession(session))
-    }
-
-    if (session.status === 'linking_vercel') {
-      const project = await linkVercelRepository(session)
-      if (project.id !== session.vercel_project_id) {
-        session = await updateSession(session.id, { vercel_project_id: project.id, error_message: null })
+      const projectName = resumableSupabaseProjectName(input.projectName?.trim() || 'spend-private', claim.session.id)
+      if (!organizationSlug) {
+        session = await finishProvisioningStep(claim, { status: 'ready_to_provision', error_message: 'Choose a Supabase organization' })
+        return response.status(400).json({ error: 'Choose a Supabase organization', session: publicSession(session) })
       }
-      // Vercel OAuth integration tokens cannot modify Vercel Authentication.
-      // New personal projects are public by default, so this account-level
-      // setting must not block repository linking or deployment.
-      session = await updateSession(session.id, { status: 'deploying', error_message: null })
-      return response.status(202).json(publicSession(session))
-    }
-
-    if (!session.deployment_url) {
-      const deployment = await createVercelDeployment(session)
-      const previewUrl = `https://${deployment.url}`
-      const deploymentUrl = `https://${deployment.projectName}.vercel.app`
-      await configureSupabaseAuth(session, deploymentUrl, previewUrl)
-      session = await updateSession(session.id, {
+      const project = await createSupabaseProject(claim.session, organizationSlug, projectName, parseSupabaseRegionGroup(input.regionGroup))
+      session = await finishProvisioningStep(claim, { supabase_project_ref: project.ref, status: 'applying_schema' })
+    } else if (step === 'applying_schema') {
+      await applySpendSchema(claim.session)
+      session = await finishProvisioningStep(claim, { status: 'deploying_plaid_link_token' })
+    } else if (step === 'deploying_plaid_link_token') {
+      await deploySpendFunction(claim.session, 'plaid-link-token')
+      session = await finishProvisioningStep(claim, { status: 'deploying_plaid_exchange' })
+    } else if (step === 'deploying_plaid_exchange') {
+      await deploySpendFunction(claim.session, 'plaid-exchange')
+      session = await finishProvisioningStep(claim, { status: 'deploying_plaid_sync' })
+    } else if (step === 'deploying_plaid_sync') {
+      await deploySpendFunction(claim.session, 'plaid-sync')
+      session = await finishProvisioningStep(claim, { status: 'reading_supabase_key' })
+    } else if (step === 'reading_supabase_key') {
+      const publishableKey = await getSupabasePublishableKey(claim.session)
+      session = await finishProvisioningStep(claim, { supabase_publishable_key: publishableKey, status: 'configuring_auth' })
+    } else if (step === 'configuring_auth') {
+      const deploymentUrl = setupBaseUrl()
+      await configureSupabaseAuth(claim.session, deploymentUrl)
+      const completed: SetupSession = { ...claim.session, deployment_url: deploymentUrl, status: 'complete', error_message: null }
+      await savePrivateApp(completed)
+      session = await finishProvisioningStep(claim, {
         deployment_url: deploymentUrl,
         status: 'complete',
         error_message: null,
@@ -62,14 +67,19 @@ export default async function handler(request: ApiRequest, response: ApiResponse
         supabase_refresh_token_encrypted: null,
         vercel_token_encrypted: null,
       })
-      await savePrivateApp(session)
       return response.status(200).json(publicSession(session))
+    } else {
+      throw new Error(`Setup cannot resume from status “${step}”`)
     }
 
-    response.status(200).json(publicSession(session))
+    response.status(202).json(publicSession(session))
   } catch (error) {
     const message = publicError(error)
-    session = await updateSession(session.id, { error_message: message })
+    try {
+      session = await finishProvisioningStep(claim, { status: step, error_message: message })
+    } catch {
+      session = (await sessionFromRequest(request)) ?? session
+    }
     response.status(500).json({ error: message, session: publicSession(session) })
   }
 }

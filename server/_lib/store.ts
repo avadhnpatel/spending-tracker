@@ -66,7 +66,9 @@ export async function privateAppForUser(userId: string): Promise<PrivateApp | nu
 }
 
 export async function savePrivateApp(session: SetupSession): Promise<void> {
-  if (!session.directory_user_id || !session.directory_email || !session.deployment_url || !session.supabase_project_ref) return
+  if (!session.directory_user_id || !session.directory_email || !session.deployment_url || !session.supabase_project_ref || !session.supabase_publishable_key) {
+    throw new Error('Private app details are incomplete')
+  }
   await dbRequest<PrivateApp[]>('private_apps', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -126,10 +128,65 @@ export async function updateSession(id: string, patch: Partial<SetupSession>): P
   return session
 }
 
+export type ProvisioningClaim = {
+  session: SetupSession
+  step: string
+  claimedAt: string
+}
+
+const PROVISIONING_LEASE_MS = 90_000
+
+function visibleStatus(status: string): string {
+  return status.startsWith('running:') ? status.slice('running:'.length) : status
+}
+
+export async function claimProvisioningStep(session: SetupSession): Promise<ProvisioningClaim | null> {
+  const step = visibleStatus(session.status)
+  if (session.status.startsWith('running:')) {
+    const updatedAt = Date.parse(session.updated_at)
+    if (Number.isFinite(updatedAt) && Date.now() - updatedAt < PROVISIONING_LEASE_MS) return null
+  }
+
+  const claimedAt = new Date().toISOString()
+  const params = new URLSearchParams({
+    id: `eq.${session.id}`,
+    status: `eq.${session.status}`,
+    updated_at: `eq.${session.updated_at}`,
+  })
+  const rows = await dbRequest<SetupSession[]>(`provisioning_sessions?${params.toString()}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      status: `running:${step}`,
+      error_message: null,
+      updated_at: claimedAt,
+      expires_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+    }),
+  })
+  const claimed = rows[0]
+  return claimed ? { session: claimed, step, claimedAt } : null
+}
+
+export async function finishProvisioningStep(claim: ProvisioningClaim, patch: Partial<SetupSession>): Promise<SetupSession> {
+  const params = new URLSearchParams({
+    id: `eq.${claim.session.id}`,
+    status: `eq.running:${claim.step}`,
+    updated_at: `eq.${claim.claimedAt}`,
+  })
+  const rows = await dbRequest<SetupSession[]>(`provisioning_sessions?${params.toString()}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+  })
+  const session = rows[0]
+  if (!session) throw new Error('This setup step was already resumed in another request')
+  return session
+}
+
 export function publicSession(session: SetupSession) {
   return {
     id: session.id,
-    status: session.status,
+    status: visibleStatus(session.status),
     connections: {
       github: Boolean(session.github_connected_at),
       supabase: Boolean(session.supabase_connected_at),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseSupabaseRegionGroup, supabaseProjectBody } from './supabase-project'
+import { parseSupabaseRegionGroup, resumableSupabaseProjectName, supabaseProjectBody } from './supabase-project'
 
 describe('Supabase project creation', () => {
   it('sends exactly one smart region selection', () => {
@@ -17,5 +17,10 @@ describe('Supabase project creation', () => {
     expect(parseSupabaseRegionGroup('apac')).toBe('apac')
     expect(parseSupabaseRegionGroup(undefined)).toBe('americas')
     expect(parseSupabaseRegionGroup('invalid')).toBe('americas')
+  })
+
+  it('uses a deterministic project name so an interrupted create can be recovered', () => {
+    expect(resumableSupabaseProjectName(' My Spend! ', '123e4567-e89b-12d3-a456-426614174000')).toBe('my-spend-123e4567e8')
+    expect(resumableSupabaseProjectName('', '')).toBe('spend-private')
   })
 })

@@ -72,7 +72,11 @@ export function AccountPage() {
   useEffect(() => {
     if (!app || appOpened.current) return
     appOpened.current = true
-    void openExistingApp().catch((error: unknown) => {
+    void saveRuntimeSupabaseConfig({
+      url: `https://${app.supabase_project_ref}.supabase.co`,
+      publishableKey: app.supabase_publishable_key,
+      deploymentUrl: app.deployment_url,
+    }).then(() => window.location.replace('/login')).catch((error: unknown) => {
       appOpened.current = false
       setMessage(error instanceof Error ? error.message : 'Could not open your private tracker')
     })
@@ -87,22 +91,12 @@ export function AccountPage() {
     setMessage(error ? error.message : 'Check your email for a secure sign-in link.')
   }
 
-  async function openExistingApp() {
-    if (!app) return
-    if (isNativePlatform()) {
-      await saveRuntimeSupabaseConfig({ url: `https://${app.supabase_project_ref}.supabase.co`, publishableKey: app.supabase_publishable_key, deploymentUrl: app.deployment_url })
-      window.location.replace('/login')
-      return
-    }
-    window.location.assign(app.deployment_url)
-  }
-
   if (!directorySupabase) return <GatewayShell><p className="text-red-700">This gateway is not configured yet. Add the directory Supabase URL and publishable key to this deployment.</p></GatewayShell>
   if (!sessionReady) return <GatewayShell><p className="text-stone-500">Loading your account…</p></GatewayShell>
   if (!directoryAccessToken) return (
     <GatewayShell>
       <p className="mt-3 text-stone-600">Create and own your private Spending Tracker.</p>
-      <p className="mt-2 text-sm leading-6 text-stone-500">We’ll verify your email, then guide you through connecting GitHub, Supabase, and Vercel. You do not need a Vercel account before you begin.</p>
+      <p className="mt-2 text-sm leading-6 text-stone-500">We’ll verify your email, then help you create a private Supabase project that you own. No GitHub or Vercel account is required.</p>
       <form onSubmit={requestLink} className="mt-7 space-y-3">
         <input required type="email" autoComplete="email" placeholder="you@email.com" value={email} onChange={(event) => setEmail(event.target.value)} className="w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700" />
         <button disabled={busy} className="min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">{busy ? 'Sending…' : 'Continue with email'}</button>
@@ -110,7 +104,7 @@ export function AccountPage() {
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
-  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">Preparing your private setup…</p><p className="mt-2 text-sm leading-6 text-stone-500">Next, you’ll connect the services that will own your code, database, and deployment.</p>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}{!busy && message ? <button type="button" onClick={() => { setupStarted.current = false; setSessionReady(false); window.setTimeout(() => setSessionReady(true), 0) }} className="mt-5 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900">Try again</button> : null}</GatewayShell>
+  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">Preparing your private setup…</p><p className="mt-2 text-sm leading-6 text-stone-500">Next, you’ll connect Supabase so Spend can create the private database you own.</p>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}{!busy && message ? <button type="button" onClick={() => { setupStarted.current = false; setSessionReady(false); window.setTimeout(() => setSessionReady(true), 0) }} className="mt-5 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900">Try again</button> : null}</GatewayShell>
   return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }
 

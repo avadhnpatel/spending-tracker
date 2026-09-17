@@ -45,10 +45,11 @@ URL Configuration, then redeploy if the domain or environment variables changed.
 
 ## Automated private copies
 
-The public `/setup` page is the start of a guided installer for friends. It connects
-GitHub, creates a private repository from this template, and connects the user's own
-Supabase and Vercel accounts. Their financial data and free-tier limits belong to
-their projects rather than this app's Supabase project.
+The public `/setup` page is a guided installer for friends. It connects only the
+user's Supabase account and creates their private database, authentication, storage,
+and Edge Functions there. The shared `spendingtrkr.com` deployment is a stateless app
+shell; after directory sign-in it loads that user's Supabase URL and publishable key
+in the browser. Financial data and free-tier limits stay in the user's project.
 
 The installer uses a separate, server-only provisioning database. See
 [`provisioning/README.md`](provisioning/README.md) for provider registration,
@@ -57,7 +58,7 @@ callback URLs, environment variables, and security boundaries.
 ## iOS app
 
 Spend can be packaged as an iOS app with Capacitor. The native app uses the same private
-GitHub/Supabase/Vercel onboarding flow and stores only the selected Supabase URL and publishable
+Supabase onboarding flow and stores only the selected Supabase URL and publishable
 key on the device. See [`IOS_SETUP.md`](IOS_SETUP.md) for Mac requirements, iOS URL-scheme setup,
 and the physical-device validation checklist.
 
