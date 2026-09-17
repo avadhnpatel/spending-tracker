@@ -228,24 +228,6 @@ export async function linkVercelRepository(session: SetupSession): Promise<Verce
   return createVercelProject(session, session.supabase_publishable_key)
 }
 
-/**
- * A Spend deployment is a public web shell. Authentication is handled by the
- * private Supabase project that backs it, so Vercel Authentication would only
- * put an unrelated Vercel sign-in screen in front of the app (and prevents
- * magic-link callbacks from reaching it).
- *
- * Teams can apply Vercel Authentication as the default for every new project.
- * Clear that inherited setting for the project created by the installer.
- */
-export async function disableVercelAuthentication(session: SetupSession): Promise<void> {
-  if (!session.vercel_project_id) throw new Error('Vercel project is missing')
-  await providerRequest(`https://api.vercel.com/v9/projects/${encodeURIComponent(session.vercel_project_id)}${teamQuery(session)}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${vercelToken(session)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ssoProtection: null }),
-  })
-}
-
 export async function createVercelDeployment(session: SetupSession) {
   if (!session.vercel_project_id || !session.repository_full_name) throw new Error('Vercel project is missing')
   const project = await findVercelProject(session, session.vercel_project_id)
