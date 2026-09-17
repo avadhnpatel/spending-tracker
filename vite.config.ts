@@ -26,6 +26,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192.png', 'pwa-512.png'],
+      workbox: {
+        // OAuth starts and callbacks are top-level navigations. They must reach
+        // the Vercel Function instead of the SPA navigation fallback.
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: 'Spend',
         short_name: 'Spend',
