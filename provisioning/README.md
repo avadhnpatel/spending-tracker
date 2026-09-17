@@ -157,6 +157,12 @@ session completes setup. Existing deployed private apps created before this
 directory feature must be added to `private_apps` once (or run a recovery flow)
 before they can be discovered on a new device.
 
+When creating the private Supabase project, the installer sends exactly one
+`region_selection` smart group. The user can choose Americas, EMEA, or Asia
+Pacific; older clients that omit the field safely default to Americas. Do not
+send the deprecated `region` field together with `region_selection`, because
+the Supabase Management API rejects requests containing both.
+
 ## Security boundaries
 
 - Provider secrets and OAuth tokens exist only in Vercel server functions and

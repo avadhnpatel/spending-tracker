@@ -15,6 +15,7 @@ type SetupSession = {
 }
 
 type SupabaseOrganization = { id: string; slug: string; name: string }
+type SupabaseRegionGroup = 'americas' | 'emea' | 'apac'
 
 async function readJson<T>(response: Response): Promise<T> {
   const body = await response.json() as T & { error?: string }
@@ -29,6 +30,7 @@ export function SetupPage() {
   const [organizations, setOrganizations] = useState<SupabaseOrganization[]>([])
   const [organizationSlug, setOrganizationSlug] = useState('')
   const [projectName, setProjectName] = useState('spend-private')
+  const [regionGroup, setRegionGroup] = useState<SupabaseRegionGroup>('americas')
   const [error, setError] = useState<string | null>(() => new URLSearchParams(location.search).get('error'))
 
   useEffect(() => {
@@ -92,7 +94,7 @@ export function SetupPage() {
       const response = await fetch('/api/setup/provision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationSlug, projectName }),
+        body: JSON.stringify({ organizationSlug, projectName, regionGroup }),
       })
       const next = await readJson<SetupSession>(response)
       setSession(next)
@@ -171,6 +173,13 @@ export function SetupPage() {
                 </label>
                 <label className="block text-sm font-semibold text-teal-950">Project name
                   <input value={projectName} onChange={(event) => setProjectName(event.target.value)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60" />
+                </label>
+                <label className="block text-sm font-semibold text-teal-950">Database region
+                  <select value={regionGroup} onChange={(event) => setRegionGroup(event.target.value as SupabaseRegionGroup)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">
+                    <option value="americas">Americas</option>
+                    <option value="emea">Europe, Middle East, and Africa</option>
+                    <option value="apac">Asia Pacific</option>
+                  </select>
                 </label>
                 <button type="button" onClick={() => void provision()} disabled={busy || !organizationSlug} className="min-h-12 w-full rounded-xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-50">{busy ? setupStatusLabel(session.status) : session.supabaseProjectRef ? 'Resume setup' : 'Create my private app'}</button>
               </div>

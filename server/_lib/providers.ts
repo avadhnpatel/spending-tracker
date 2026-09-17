@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { decryptSecret } from './crypto.js'
+import { supabaseProjectBody, type SupabaseRegionGroup } from './supabase-project.js'
 import type { SetupSession } from './types.js'
 
 type ProviderError = { message?: string; error?: string; error_description?: string }
@@ -37,12 +38,12 @@ export async function listSupabaseOrganizations(session: SetupSession): Promise<
   })
 }
 
-export async function createSupabaseProject(session: SetupSession, organizationSlug: string, name: string) {
+export async function createSupabaseProject(session: SetupSession, organizationSlug: string, name: string, regionGroup: SupabaseRegionGroup) {
   const dbPass = `${crypto.randomUUID()}Aa1!`
   return providerRequest<{ ref: string; name: string }>('https://api.supabase.com/v1/projects', {
     method: 'POST',
     headers: { Authorization: `Bearer ${supabaseToken(session)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ organization_slug: organizationSlug, name, db_pass: dbPass }),
+    body: JSON.stringify(supabaseProjectBody(organizationSlug, name, dbPass, regionGroup)),
   })
 }
 

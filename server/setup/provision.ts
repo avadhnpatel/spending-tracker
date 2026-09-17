@@ -1,9 +1,10 @@
 import { allowMethods, publicError } from '../_lib/http.js'
 import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, disableVercelAuthentication, getSupabasePublishableKey } from '../_lib/providers.js'
 import { publicSession, savePrivateApp, sessionFromRequest, updateSession } from '../_lib/store.js'
+import { parseSupabaseRegionGroup } from '../_lib/supabase-project.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
 
-type Input = { organizationSlug?: string; projectName?: string }
+type Input = { organizationSlug?: string; projectName?: string; regionGroup?: string }
 
 function ready(session: SetupSession): boolean {
   return Boolean(session.repository_full_name && session.github_token_encrypted && session.supabase_token_encrypted && session.vercel_token_encrypted)
@@ -20,7 +21,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       const projectName = input.projectName?.trim() || session.repository_full_name!.split('/')[1]!
       if (!organizationSlug) return response.status(400).json({ error: 'Choose a Supabase organization' })
       session = await updateSession(session.id, { status: 'creating_supabase', error_message: null })
-      const project = await createSupabaseProject(session, organizationSlug, projectName)
+      const project = await createSupabaseProject(session, organizationSlug, projectName, parseSupabaseRegionGroup(input.regionGroup))
       session = await updateSession(session.id, { supabase_project_ref: project.ref, status: 'configuring_supabase' })
       return response.status(202).json(publicSession(session))
     }
