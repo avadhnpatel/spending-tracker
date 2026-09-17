@@ -5,6 +5,8 @@ import type { ApiRequest, ApiResponse } from '../../../_lib/types.js'
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   try {
+    const oauthError = queryValue(request.query.error_description) || queryValue(request.query.error)
+    if (oauthError) throw new Error(oauthError === 'access_denied' ? 'Vercel authorization was cancelled' : oauthError)
     const code = queryValue(request.query.code)
     const state = queryValue(request.query.state)
     const session = state ? await sessionByOAuthState('vercel', state) : null

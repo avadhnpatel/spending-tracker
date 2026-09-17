@@ -110,6 +110,13 @@ For API scopes, select only: `user` (read), `team` (read), `project` (read/write
 
 The Redirect URL is the installer endpoint. Vercel sends a short-lived code there after a friend approves the integration; our server exchanges it for a token and then creates their project and deployment.
 
+Vercel's external installation page intentionally requires the user to click
+**Add Integration**, choose the Vercel account and project scope, and then click
+**Install** after signing in. Login alone does not authorize the integration.
+Spend opens this page in a separate tab and explains those steps in the setup UI;
+after **Install**, Vercel calls the configured Redirect URL and Spend resumes the
+same setup session automatically.
+
 After the integration is created, open its settings in the Integration Console. At the bottom, under **Credentials**, copy the client ID and client secret. Its URL slug is the value entered above.
 
 In Vercel → **spending-tracker** → **Settings** → **Environment Variables**, add `VERCEL_INTEGRATION_SLUG`, `VERCEL_INTEGRATION_CLIENT_ID`, and `VERCEL_INTEGRATION_CLIENT_SECRET`; mark the secret sensitive and redeploy after saving.

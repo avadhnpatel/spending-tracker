@@ -151,7 +151,12 @@ export function SetupPage() {
           </SetupStep>
 
           <SetupStep number="4" title="Connect Vercel" description="Vercel publishes your app at a secure web address." done={session.connections.vercel} locked={!session.connections.supabase}>
-            {session.connections.vercel ? <Status text="Vercel connected" /> : <ConnectButton href="/api/setup/oauth/vercel/start" label="Connect Vercel" disabled={!session.connections.supabase} />}
+            {session.connections.vercel ? <Status text="Vercel connected" /> : (
+              <div>
+                <p className="mb-3 text-sm leading-6 text-stone-600">Vercel opens in a new tab. After signing in, click <strong>Add Integration</strong>, choose your Vercel account, then click <strong>Install</strong>. Vercel will return you to Spend automatically.</p>
+                <ConnectButton href="/api/setup/oauth/vercel/start" label="Continue to Vercel" disabled={!session.connections.supabase} newTab />
+              </div>
+            )}
           </SetupStep>
 
           {completed === 4 && session.status !== 'complete' ? (
@@ -209,8 +214,8 @@ function SetupStep({ number, title, description, done, locked = false, children 
   )
 }
 
-function ConnectButton({ href, label, disabled = false }: { href: string; label: string; disabled?: boolean }) {
-  return disabled ? <button type="button" disabled className="min-h-12 rounded-xl bg-stone-100 px-5 font-semibold text-stone-400">{label}</button> : <a href={href} className="inline-flex min-h-12 items-center rounded-xl bg-stone-900 px-5 font-semibold text-white">{label} →</a>
+function ConnectButton({ href, label, disabled = false, newTab = false }: { href: string; label: string; disabled?: boolean; newTab?: boolean }) {
+  return disabled ? <button type="button" disabled className="min-h-12 rounded-xl bg-stone-100 px-5 font-semibold text-stone-400">{label}</button> : <a href={href} target={newTab ? '_blank' : undefined} rel={newTab ? 'noopener' : undefined} className="inline-flex min-h-12 items-center rounded-xl bg-stone-900 px-5 font-semibold text-white">{label} →</a>
 }
 
 function Status({ text }: { text: string }) {
