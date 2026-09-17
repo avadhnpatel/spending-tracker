@@ -57,7 +57,7 @@ export function SetupPage() {
   }, [session?.id, session?.mobileHandoff, session?.status])
 
   useEffect(() => {
-    if (!session?.connections.supabase || session.status === 'complete') return
+    if (!session?.connections.supabase) return
     async function loadOptions() {
       try {
         const result = await readJson<{ organizations: SupabaseOrganization[] }>(await fetch('/api/setup/options'))
@@ -68,7 +68,7 @@ export function SetupPage() {
       }
     }
     void loadOptions()
-  }, [session?.connections.supabase, session?.status])
+  }, [session?.connections.supabase])
 
   async function provision() {
     setBusy(true)
