@@ -1,5 +1,5 @@
 import { allowMethods, publicError } from '../_lib/http.js'
-import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, disableVercelAuthentication, getSupabasePublishableKey } from '../_lib/providers.js'
+import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, createVercelDeployment, createVercelProject, deploySpendFunctions, disableVercelAuthentication, getSupabasePublishableKey, linkVercelRepository } from '../_lib/providers.js'
 import { publicSession, savePrivateApp, sessionFromRequest, updateSession } from '../_lib/store.js'
 import { parseSupabaseRegionGroup } from '../_lib/supabase-project.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
@@ -32,16 +32,21 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       await deploySpendFunctions(session)
       const publishableKey = await getSupabasePublishableKey(session)
       const project = await createVercelProject(session, publishableKey)
-      session = await updateSession(session.id, { vercel_project_id: project.id, supabase_publishable_key: publishableKey, status: 'deploying' })
+      session = await updateSession(session.id, { vercel_project_id: project.id, supabase_publishable_key: publishableKey, status: 'linking_vercel' })
+      return response.status(202).json(publicSession(session))
+    }
+
+    if (session.status === 'linking_vercel') {
+      await linkVercelRepository(session)
       await disableVercelAuthentication(session)
+      session = await updateSession(session.id, { status: 'deploying', error_message: null })
       return response.status(202).json(publicSession(session))
     }
 
     if (!session.deployment_url) {
       const deployment = await createVercelDeployment(session)
       const previewUrl = `https://${deployment.url}`
-      const projectName = session.repository_full_name!.split('/')[1]!.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90)
-      const deploymentUrl = `https://${projectName}.vercel.app`
+      const deploymentUrl = `https://${deployment.projectName}.vercel.app`
       await configureSupabaseAuth(session, deploymentUrl, previewUrl)
       session = await updateSession(session.id, {
         deployment_url: deploymentUrl,

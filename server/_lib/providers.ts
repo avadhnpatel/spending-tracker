@@ -6,6 +6,13 @@ import type { SetupSession } from './types.js'
 
 type ProviderError = { message?: unknown; error?: unknown; error_description?: unknown; details?: unknown; hint?: unknown }
 
+class ProviderRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message)
+    this.name = 'ProviderRequestError'
+  }
+}
+
 function nestedMessage(value: unknown): string | null {
   if (typeof value === 'string') return value.trim() || null
   if (!value || typeof value !== 'object') return null
@@ -30,7 +37,7 @@ async function providerRequest<T>(url: string, init: RequestInit): Promise<T> {
   const text = await response.text()
   let body: T & ProviderError
   try { body = (text ? JSON.parse(text) : {}) as T & ProviderError } catch { body = {} as T & ProviderError }
-  if (!response.ok) throw new Error(providerErrorMessage(body, response.status))
+  if (!response.ok) throw new ProviderRequestError(providerErrorMessage(body, response.status), response.status)
   return body
 }
 
@@ -128,18 +135,89 @@ function teamQuery(session: SetupSession): string {
   return session.vercel_team_id ? `?teamId=${encodeURIComponent(session.vercel_team_id)}` : ''
 }
 
+type VercelProject = {
+  id: string
+  name: string
+  link?: { org?: string; repo?: string; type?: string } | null
+}
+
+function normalizedVercelProjectName(repositoryFullName: string): string {
+  return repositoryFullName.split('/')[1]!.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 80)
+}
+
+export function vercelProjectNameCandidates(repositoryFullName: string, sessionId: string): string[] {
+  const base = normalizedVercelProjectName(repositoryFullName) || 'spend-private'
+  const suffix = sessionId.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12)
+  return suffix ? [base, `${base}-${suffix}`] : [base]
+}
+
+function projectCanBeResumed(project: VercelProject, repositoryFullName: string): boolean {
+  if (!project.link) return true
+  const [owner, repo] = repositoryFullName.toLowerCase().split('/')
+  const linkedRepo = project.link.repo?.toLowerCase()
+  const linkedOwner = project.link.org?.toLowerCase()
+  return (!linkedRepo || linkedRepo === repo || linkedRepo === repositoryFullName.toLowerCase())
+    && (!linkedOwner || linkedOwner === owner)
+}
+
+async function findVercelProject(session: SetupSession, nameOrId: string): Promise<VercelProject | null> {
+  try {
+    return await providerRequest<VercelProject>(`https://api.vercel.com/v9/projects/${encodeURIComponent(nameOrId)}${teamQuery(session)}`, {
+      headers: { Authorization: `Bearer ${vercelToken(session)}` },
+    })
+  } catch (error) {
+    if (error instanceof ProviderRequestError && (error.status === 404 || error.status === 410)) return null
+    throw error
+  }
+}
+
+function recoverableProjectNameError(error: unknown): boolean {
+  return error instanceof ProviderRequestError
+    && (error.status === 400 || error.status === 409 || error.status === 410)
+    && /already exists|has been removed|removed resource/i.test(error.message)
+}
+
 export async function createVercelProject(session: SetupSession, publishableKey: string) {
   if (!session.repository_full_name || !session.supabase_project_ref) throw new Error('Provisioning details are incomplete')
-  const projectName = session.repository_full_name.split('/')[1]!.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 90)
+  const projectNames = vercelProjectNameCandidates(session.repository_full_name, session.id)
   const targets = ['production', 'preview', 'development']
   const variables = [
     ['VITE_SUPABASE_URL', `https://${session.supabase_project_ref}.supabase.co`],
     ['VITE_SUPABASE_PUBLISHABLE_KEY', publishableKey],
   ].flatMap(([key, value]) => targets.map((target) => ({ key, value, target, type: 'encrypted' })))
-  return providerRequest<{ id: string; name: string }>(`https://api.vercel.com/v11/projects${teamQuery(session)}`, {
-    method: 'POST',
+
+  for (const name of projectNames) {
+    const existing = await findVercelProject(session, name)
+    if (existing && projectCanBeResumed(existing, session.repository_full_name)) return existing
+  }
+
+  let lastError: unknown
+  for (const name of projectNames) {
+    try {
+      // Save the project ID before linking GitHub. Vercel can create the
+      // project and then fail the repository link, so these must be separate
+      // resumable operations.
+      return await providerRequest<VercelProject>(`https://api.vercel.com/v11/projects${teamQuery(session)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${vercelToken(session)}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, framework: 'vite', environmentVariables: variables }),
+      })
+    } catch (error) {
+      lastError = error
+      if (!recoverableProjectNameError(error)) throw error
+      const existing = await findVercelProject(session, name)
+      if (existing && projectCanBeResumed(existing, session.repository_full_name)) return existing
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Could not create the Vercel project')
+}
+
+export async function linkVercelRepository(session: SetupSession): Promise<void> {
+  if (!session.vercel_project_id || !session.repository_full_name) throw new Error('Vercel project is missing')
+  await providerRequest(`https://api.vercel.com/v9/projects/${encodeURIComponent(session.vercel_project_id)}${teamQuery(session)}`, {
+    method: 'PATCH',
     headers: { Authorization: `Bearer ${vercelToken(session)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: projectName, framework: 'vite', gitRepository: { type: 'github', repo: session.repository_full_name }, environmentVariables: variables }),
+    body: JSON.stringify({ gitRepository: { type: 'github', repo: session.repository_full_name } }),
   })
 }
 
@@ -163,11 +241,13 @@ export async function disableVercelAuthentication(session: SetupSession): Promis
 
 export async function createVercelDeployment(session: SetupSession) {
   if (!session.vercel_project_id || !session.repository_full_name) throw new Error('Vercel project is missing')
+  const project = await findVercelProject(session, session.vercel_project_id)
+  if (!project) throw new Error('The Vercel project is no longer available')
   const repository = await githubRepository(session)
-  const name = session.repository_full_name.split('/')[1]!
-  return providerRequest<{ id: string; url: string; readyState?: string }>(`https://api.vercel.com/v13/deployments${teamQuery(session)}`, {
+  const deployment = await providerRequest<{ id: string; url: string; readyState?: string }>(`https://api.vercel.com/v13/deployments${teamQuery(session)}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${vercelToken(session)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, project: session.vercel_project_id, target: 'production', gitSource: { type: 'github', repoId: repository.id, ref: repository.default_branch || 'main' } }),
+    body: JSON.stringify({ name: project.name, project: session.vercel_project_id, target: 'production', gitSource: { type: 'github', repoId: repository.id, ref: repository.default_branch || 'main' } }),
   })
+  return { ...deployment, projectName: project.name }
 }

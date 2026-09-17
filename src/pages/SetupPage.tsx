@@ -211,6 +211,7 @@ export function SetupPage() {
 function setupStatusLabel(status: string): string {
   if (status === 'creating_supabase') return 'Creating Supabase project…'
   if (status === 'configuring_supabase') return 'Configuring database…'
+  if (status === 'linking_vercel') return 'Linking your repository…'
   if (status === 'deploying') return 'Deploying to Vercel…'
   return 'Working…'
 }

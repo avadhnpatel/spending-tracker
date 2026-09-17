@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { providerErrorMessage } from './providers'
+import { providerErrorMessage, vercelProjectNameCandidates } from './providers'
 
 describe('providerErrorMessage', () => {
   it('extracts messages from nested provider errors', () => {
@@ -10,5 +10,12 @@ describe('providerErrorMessage', () => {
   it('never renders an object as [object Object]', () => {
     expect(providerErrorMessage({ error: { code: 'unknown' } }, 503))
       .toBe('Provider request failed (503)')
+  })
+})
+
+describe('vercelProjectNameCandidates', () => {
+  it('uses a deterministic fallback when the preferred name is unavailable or tombstoned', () => {
+    expect(vercelProjectNameCandidates('avadhandvraj/Spend Private', '12345678-abcd-4321-abcd-1234567890ab'))
+      .toEqual(['spend-private', 'spend-private-12345678abcd'])
   })
 })
