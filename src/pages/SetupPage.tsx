@@ -18,8 +18,15 @@ type SupabaseOrganization = { id: string; slug: string; name: string }
 type SupabaseRegionGroup = 'americas' | 'emea' | 'apac'
 
 async function readJson<T>(response: Response): Promise<T> {
-  const body = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(body.error || 'Setup request failed')
+  const body = await response.json() as T & { error?: unknown }
+  if (!response.ok) {
+    const message = typeof body.error === 'string'
+      ? body.error
+      : body.error && typeof body.error === 'object' && 'message' in body.error && typeof body.error.message === 'string'
+        ? body.error.message
+        : 'Setup request failed'
+    throw new Error(message)
+  }
   return body
 }
 

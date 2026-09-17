@@ -4,14 +4,33 @@ import { decryptSecret } from './crypto.js'
 import { supabaseProjectBody, type SupabaseRegionGroup } from './supabase-project.js'
 import type { SetupSession } from './types.js'
 
-type ProviderError = { message?: string; error?: string; error_description?: string }
+type ProviderError = { message?: unknown; error?: unknown; error_description?: unknown; details?: unknown; hint?: unknown }
+
+function nestedMessage(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() || null
+  if (!value || typeof value !== 'object') return null
+  if (Array.isArray(value)) {
+    const messages = value.map(nestedMessage).filter((message): message is string => Boolean(message))
+    return messages.length ? messages.join('; ') : null
+  }
+  const body = value as ProviderError
+  for (const candidate of [body.message, body.error_description, body.details, body.hint, body.error]) {
+    const message = nestedMessage(candidate)
+    if (message) return message
+  }
+  return null
+}
+
+export function providerErrorMessage(body: unknown, status: number): string {
+  return nestedMessage(body) || `Provider request failed (${status})`
+}
 
 async function providerRequest<T>(url: string, init: RequestInit): Promise<T> {
   const response = await fetch(url, init)
   const text = await response.text()
   let body: T & ProviderError
   try { body = (text ? JSON.parse(text) : {}) as T & ProviderError } catch { body = {} as T & ProviderError }
-  if (!response.ok) throw new Error(body.message || body.error_description || body.error || `Provider request failed (${response.status})`)
+  if (!response.ok) throw new Error(providerErrorMessage(body, response.status))
   return body
 }
 

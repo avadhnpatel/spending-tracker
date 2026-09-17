@@ -1,4 +1,6 @@
--- Run this in the Supabase SQL editor (once per project).
+-- Run this in the Supabase SQL editor. It is safe to retry after interruption.
+
+begin;
 
 create table if not exists public.tracker_collections (
   id uuid primary key default gen_random_uuid(),
@@ -166,6 +168,40 @@ alter table public.financial_connections enable row level security;
 alter table public.financial_accounts enable row level security;
 alter table public.import_candidates enable row level security;
 alter table public.import_dedup_keys enable row level security;
+
+-- PostgreSQL does not support CREATE POLICY IF NOT EXISTS. Drop and recreate
+-- policies inside this transaction so retries cannot fail on a partial run or
+-- leave a project without its intended RLS policies.
+drop policy if exists "tracker_collections_select" on public.tracker_collections;
+drop policy if exists "tracker_collections_insert" on public.tracker_collections;
+drop policy if exists "tracker_collections_update" on public.tracker_collections;
+drop policy if exists "tracker_collections_delete" on public.tracker_collections;
+drop policy if exists "trackers_select" on public.trackers;
+drop policy if exists "trackers_insert" on public.trackers;
+drop policy if exists "trackers_update" on public.trackers;
+drop policy if exists "trackers_delete" on public.trackers;
+drop policy if exists "categories_select" on public.categories;
+drop policy if exists "categories_insert" on public.categories;
+drop policy if exists "categories_update" on public.categories;
+drop policy if exists "categories_delete" on public.categories;
+drop policy if exists "recurring_select" on public.recurring;
+drop policy if exists "recurring_insert" on public.recurring;
+drop policy if exists "recurring_update" on public.recurring;
+drop policy if exists "recurring_delete" on public.recurring;
+drop policy if exists "transactions_select" on public.transactions;
+drop policy if exists "transactions_insert" on public.transactions;
+drop policy if exists "transactions_update" on public.transactions;
+drop policy if exists "transactions_delete" on public.transactions;
+drop policy if exists "category_budgets_select" on public.category_budgets;
+drop policy if exists "category_budgets_insert" on public.category_budgets;
+drop policy if exists "category_budgets_update" on public.category_budgets;
+drop policy if exists "category_budgets_delete" on public.category_budgets;
+drop policy if exists "financial_accounts_select" on public.financial_accounts;
+drop policy if exists "financial_accounts_delete" on public.financial_accounts;
+drop policy if exists "import_candidates_select" on public.import_candidates;
+drop policy if exists "import_candidates_insert" on public.import_candidates;
+drop policy if exists "import_candidates_update" on public.import_candidates;
+drop policy if exists "import_candidates_delete" on public.import_candidates;
 
 create policy "tracker_collections_select" on public.tracker_collections
   for select to authenticated using (user_id = auth.uid());
@@ -386,6 +422,11 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+drop policy if exists "receipts_select" on storage.objects;
+drop policy if exists "receipts_insert" on storage.objects;
+drop policy if exists "receipts_update" on storage.objects;
+drop policy if exists "receipts_delete" on storage.objects;
+
 create policy "receipts_select" on storage.objects
   for select to authenticated using (
     bucket_id = 'receipts' and (storage.foldername(name))[1] = auth.uid()::text
@@ -402,3 +443,5 @@ create policy "receipts_delete" on storage.objects
   for delete to authenticated using (
     bucket_id = 'receipts' and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+commit;
