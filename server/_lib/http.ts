@@ -23,12 +23,19 @@ export function getCookie(request: ApiRequest, name: string): string | null {
 
 export function setSessionCookie(response: ApiResponse, value: string): void {
   const secure = setupBaseUrl().startsWith('https://') ? '; Secure' : ''
-  response.setHeader('Set-Cookie', `spend_setup_session=${encodeURIComponent(value)}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=7200`)
+  response.setHeader('Set-Cookie', `spend_setup_session=${encodeURIComponent(value)}; HttpOnly${secure}; SameSite=Lax${setupCookieDomain()}; Path=/; Max-Age=7200`)
 }
 
 export function clearSessionCookie(response: ApiResponse): void {
   const secure = setupBaseUrl().startsWith('https://') ? '; Secure' : ''
-  response.setHeader('Set-Cookie', `spend_setup_session=; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=0`)
+  response.setHeader('Set-Cookie', `spend_setup_session=; HttpOnly${secure}; SameSite=Lax${setupCookieDomain()}; Path=/; Max-Age=0`)
+}
+
+function setupCookieDomain(): string {
+  const hostname = new URL(setupBaseUrl()).hostname
+  return hostname === 'spendingtrkr.com' || hostname === 'www.spendingtrkr.com'
+    ? '; Domain=spendingtrkr.com'
+    : ''
 }
 
 export function setupBaseUrl(): string {
