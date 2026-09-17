@@ -1,9 +1,12 @@
 {
   "functions": {
-    "api/[...path].ts": {
+    "api/index.ts": {
       "includeFiles": "supabase/**",
       "maxDuration": 60
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api?path=:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
