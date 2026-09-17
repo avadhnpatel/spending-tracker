@@ -36,6 +36,7 @@ const routes: Record<string, Handler> = {
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
+  response.setHeader('X-Spend-Revision', process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || 'local')
   const value = request.query.path
   const path = Array.isArray(value) ? value.join('/') : value ?? ''
   const target = routes[path]
