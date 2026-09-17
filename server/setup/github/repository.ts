@@ -3,7 +3,7 @@ import { allowMethods, publicError } from '../../_lib/http.js'
 import { publicSession, sessionFromRequest, updateSession } from '../../_lib/store.js'
 import type { ApiRequest, ApiResponse } from '../../_lib/types.js'
 
-type RepositoryInput = { name?: string; private?: boolean }
+type RepositoryInput = { name?: string }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (!allowMethods(request, response, ['POST'])) return
@@ -33,7 +33,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
       },
-      body: JSON.stringify({ owner: session.github_login, name, private: input.private !== false, include_all_branches: false }),
+      body: JSON.stringify({ owner: session.github_login, name, private: true, include_all_branches: false }),
     })
     const repository = await githubResponse.json() as { full_name?: string; message?: string }
     if (!githubResponse.ok || !repository.full_name) throw new Error(repository.message || 'GitHub could not create the repository')

@@ -75,7 +75,7 @@ export function SetupPage() {
       const response = await fetch('/api/setup/github/repository', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: repositoryName, private: true }),
+        body: JSON.stringify({ name: repositoryName }),
       })
       setSession(await readJson<SetupSession>(response))
     } catch (cause) {
@@ -132,7 +132,7 @@ export function SetupPage() {
 
       {session ? (
         <div className="space-y-3">
-          <SetupStep number="1" title="Connect GitHub" description="GitHub holds your private copy of the app." done={session.connections.github}>
+          <SetupStep number="1" title="Connect GitHub" description="Authorize once so Spend can create and deploy your private repository. GitHub's repo permission also grants access to your other private repositories; the token is encrypted temporarily and deleted when setup finishes." done={session.connections.github}>
             {session.connections.github ? <Status text={`Connected as ${session.githubLogin}`} /> : <ConnectButton href="/api/setup/oauth/github/start" label="Connect GitHub" />}
           </SetupStep>
 

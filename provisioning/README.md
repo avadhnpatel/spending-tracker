@@ -42,19 +42,35 @@ financial data.
 3. Mark the last two as sensitive if Vercel offers that option. The names must match exactly and none may begin with `VITE_`.
 4. Click **Save** after each variable. Vercel applies variables only to new deployments, so use the **Deployments** tab to redeploy `main` after all four have been saved.
 
-### 2. GitHub App
+### 2. GitHub OAuth App
 
-Create a GitHub App in GitHub Developer settings. Use:
+Create a standard OAuth App under the `avadhnpatel` GitHub account. Do not create
+a GitHub App: GitHub Apps require each user to install the app separately, while
+this installer is designed around a single OAuth authorization. Use:
 
+- Application name: `Spend Private Setup`
 - Homepage URL: `https://spendingtrkr.com/setup`
-- Callback URL: `https://spendingtrkr.com/api/setup/oauth/github/callback`
+- Authorization callback URL: `https://spendingtrkr.com/api/setup/oauth/github/callback`
 
-In GitHub, click your avatar → **Settings** → **Developer settings** → **GitHub Apps** → **New GitHub App**. Enter the homepage URL and repository permissions above, then create the app. The **Callback URL** may appear only after the app has been created: open the new app’s settings page, find **Identifying and authorizing users**, and enter the callback URL there. Do not enable **Request user authorization (OAuth) during installation** and leave **Setup URL** blank. Spend explicitly starts the OAuth flow when someone presses **Connect GitHub**, so it only needs the callback URL. You do not need webhooks for this installer.
+In GitHub, click your avatar → **Settings** → **Developer settings** → **OAuth
+Apps** → **New OAuth App** and enter those values. OAuth Apps do not have a
+repository-permissions form. Spend requests the `repo` scope when authorization
+starts; GitHub displays that access on its consent screen. That scope is required
+to create the private repository and let provisioning read it for deployment.
+It also grants broad access to the user's other private repositories, so the UI
+discloses this before authorization. Spend encrypts the token while setup is in
+progress and deletes it after provisioning completes.
 
-In Vercel, add `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` with the client ID and newly generated client secret. Mark the secret sensitive.
+After creating the OAuth App, generate a client secret. In Vercel, add
+`GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET` using the OAuth App's
+client ID and client secret. Mark the secret sensitive. Remove the obsolete
+`GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET` variables so a GitHub App
+cannot be wired in accidentally. Redeploy after saving the new values.
 
-Mark the source GitHub repository as a **template repository** in its GitHub
-settings. Set `GITHUB_TEMPLATE_OWNER` and `GITHUB_TEMPLATE_REPO` in Vercel.
+Keep the source GitHub repository **public** and mark it as a **template
+repository** in its GitHub settings. Set `GITHUB_TEMPLATE_OWNER=avadhnpatel` and
+`GITHUB_TEMPLATE_REPO=spending-tracker` in Vercel (or use the actual public
+template repository name if it differs).
 
 ### 3. Supabase OAuth application
 
