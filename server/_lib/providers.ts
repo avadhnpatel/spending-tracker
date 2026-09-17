@@ -148,11 +148,13 @@ function normalizedVercelProjectName(repositoryFullName: string): string {
 export function vercelProjectNameCandidates(repositoryFullName: string, sessionId: string): string[] {
   const base = normalizedVercelProjectName(repositoryFullName) || 'spend-private'
   const suffix = sessionId.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12)
-  return suffix ? [base, `${base}-${suffix}`] : [base]
+  return suffix
+    ? [base, `${base}-${suffix}`, ...Array.from({ length: 4 }, (_, index) => `${base}-${suffix}-${index + 2}`)]
+    : [base]
 }
 
-function projectCanBeResumed(project: VercelProject, repositoryFullName: string): boolean {
-  if (!project.link) return true
+function projectLinksRepository(project: VercelProject, repositoryFullName: string): boolean {
+  if (!project.link) return false
   const [owner, repo] = repositoryFullName.toLowerCase().split('/')
   const linkedRepo = project.link.repo?.toLowerCase()
   const linkedOwner = project.link.org?.toLowerCase()
@@ -188,37 +190,42 @@ export async function createVercelProject(session: SetupSession, publishableKey:
 
   for (const name of projectNames) {
     const existing = await findVercelProject(session, name)
-    if (existing && projectCanBeResumed(existing, session.repository_full_name)) return existing
+    if (existing && projectLinksRepository(existing, session.repository_full_name)) return existing
   }
 
   let lastError: unknown
   for (const name of projectNames) {
     try {
-      // Save the project ID before linking GitHub. Vercel can create the
-      // project and then fail the repository link, so these must be separate
-      // resumable operations.
       return await providerRequest<VercelProject>(`https://api.vercel.com/v11/projects${teamQuery(session)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${vercelToken(session)}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, framework: 'vite', environmentVariables: variables }),
+        body: JSON.stringify({
+          name,
+          framework: 'vite',
+          environmentVariables: variables,
+          gitRepository: { type: 'github', repo: session.repository_full_name },
+        }),
       })
     } catch (error) {
       lastError = error
       if (!recoverableProjectNameError(error)) throw error
       const existing = await findVercelProject(session, name)
-      if (existing && projectCanBeResumed(existing, session.repository_full_name)) return existing
+      if (existing && projectLinksRepository(existing, session.repository_full_name)) return existing
     }
   }
   throw lastError instanceof Error ? lastError : new Error('Could not create the Vercel project')
 }
 
-export async function linkVercelRepository(session: SetupSession): Promise<void> {
+export async function linkVercelRepository(session: SetupSession): Promise<VercelProject> {
   if (!session.vercel_project_id || !session.repository_full_name) throw new Error('Vercel project is missing')
-  await providerRequest(`https://api.vercel.com/v9/projects/${encodeURIComponent(session.vercel_project_id)}${teamQuery(session)}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${vercelToken(session)}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gitRepository: { type: 'github', repo: session.repository_full_name } }),
-  })
+  const current = await findVercelProject(session, session.vercel_project_id)
+  if (current && projectLinksRepository(current, session.repository_full_name)) return current
+  if (!session.supabase_publishable_key) throw new Error('Supabase publishable key is missing')
+
+  // Vercel only accepts gitRepository while creating a project. A project
+  // left unlinked by an interrupted/failed create cannot be repaired with the
+  // project PATCH endpoint, so resume with the next deterministic project name.
+  return createVercelProject(session, session.supabase_publishable_key)
 }
 
 /**

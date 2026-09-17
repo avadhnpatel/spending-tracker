@@ -37,7 +37,10 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     }
 
     if (session.status === 'linking_vercel') {
-      await linkVercelRepository(session)
+      const project = await linkVercelRepository(session)
+      if (project.id !== session.vercel_project_id) {
+        session = await updateSession(session.id, { vercel_project_id: project.id, error_message: null })
+      }
       await disableVercelAuthentication(session)
       session = await updateSession(session.id, { status: 'deploying', error_message: null })
       return response.status(202).json(publicSession(session))

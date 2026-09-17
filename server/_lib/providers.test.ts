@@ -16,6 +16,13 @@ describe('providerErrorMessage', () => {
 describe('vercelProjectNameCandidates', () => {
   it('uses a deterministic fallback when the preferred name is unavailable or tombstoned', () => {
     expect(vercelProjectNameCandidates('avadhandvraj/Spend Private', '12345678-abcd-4321-abcd-1234567890ab'))
-      .toEqual(['spend-private', 'spend-private-12345678abcd'])
+      .toEqual([
+        'spend-private',
+        'spend-private-12345678abcd',
+        'spend-private-12345678abcd-2',
+        'spend-private-12345678abcd-3',
+        'spend-private-12345678abcd-4',
+        'spend-private-12345678abcd-5',
+      ])
   })
 })
