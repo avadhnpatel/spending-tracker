@@ -97,7 +97,7 @@ export function SetupPage() {
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))] sm:px-6">
       <header className="mb-7">
-        <a href="/account?cancelSetup=1" className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-800">← Back to Spend</a>
+        <a href="/account" className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-800">← Back to Spend</a>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.28em] text-teal-700">Private Spend setup</p>
         <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Your data, in a project you own.</h1>
         <p className="mt-3 max-w-xl leading-7 text-stone-500">Connect Supabase once. Spend creates your private database and sign-in system, while the app continues to run securely at spendingtrkr.com.</p>

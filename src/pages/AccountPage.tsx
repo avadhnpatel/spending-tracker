@@ -22,9 +22,7 @@ export function AccountPage() {
   const [app, setApp] = useState<PrivateApp | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
   const [directoryAccessToken, setDirectoryAccessToken] = useState<string | null>(null)
-  const setupStarted = useRef(false)
   const appOpened = useRef(false)
-  const setupCancelled = new URLSearchParams(window.location.search).get('cancelSetup') === '1'
 
   useEffect(() => {
     async function load() {
@@ -43,32 +41,6 @@ export function AccountPage() {
     }
     void load()
   }, [])
-
-  useEffect(() => {
-    const accessToken = directoryAccessToken
-    if (!sessionReady || !accessToken || app || setupStarted.current || setupCancelled) return
-    const verifiedAccessToken: string = accessToken
-    setupStarted.current = true
-
-    async function continuePrivateSetup() {
-      setBusy(true); setMessage('Your email is verified. Starting your private setup…')
-      try {
-        if (isNativePlatform()) {
-          await startPrivateSetup(verifiedAccessToken)
-          return
-        }
-        await directoryRequest('/api/directory/start-setup', verifiedAccessToken, { method: 'POST' })
-        navigate('/setup')
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : 'Could not start private setup')
-        setupStarted.current = false
-      } finally {
-        setBusy(false)
-      }
-    }
-
-    void continuePrivateSetup()
-  }, [app, directoryAccessToken, navigate, sessionReady, setupCancelled])
 
   useEffect(() => {
     if (!app || appOpened.current) return
@@ -97,6 +69,10 @@ export function AccountPage() {
     setBusy(true)
     setMessage('Starting your private setup…')
     try {
+      if (isNativePlatform()) {
+        await startPrivateSetup(directoryAccessToken)
+        return
+      }
       await directoryRequest('/api/directory/start-setup', directoryAccessToken, { method: 'POST' })
       navigate('/setup')
     } catch (error) {
@@ -131,8 +107,7 @@ export function AccountPage() {
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
-  if (!app && setupCancelled) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">Set up a new private database only if this email should own one. To access an existing shared tracker, return to its normal Spend sign-in screen instead.</p><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
-  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">Preparing your private setup…</p><p className="mt-2 text-sm leading-6 text-stone-500">Next, you’ll connect Supabase so Spend can create the private database you own.</p>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}{!busy && message ? <button type="button" onClick={() => { setupStarted.current = false; setSessionReady(false); window.setTimeout(() => setSessionReady(true), 0) }} className="mt-5 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900">Try again</button> : null}</GatewayShell>
+  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">Set up a new private database only if this email should own one. To access an existing shared tracker, return to its normal Spend sign-in screen instead.</p><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
   return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }
 
