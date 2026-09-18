@@ -46,6 +46,7 @@ create table if not exists public.private_apps (
 );
 
 create unique index if not exists private_apps_email_idx on public.private_apps (lower(email));
+create unique index if not exists private_apps_supabase_project_ref_idx on public.private_apps (supabase_project_ref);
 alter table public.private_apps add column if not exists supabase_publishable_key text;
 alter table public.private_apps enable row level security;
 -- There is intentionally no browser policy. The installer server verifies a

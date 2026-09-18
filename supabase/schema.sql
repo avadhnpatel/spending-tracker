@@ -2,6 +2,71 @@
 
 begin;
 
+-- A private Spend project has exactly one owner email and one Auth user.
+-- Provisioning sets the owner immediately after this schema is installed.
+create table if not exists public.spend_owner (
+  singleton boolean primary key default true check (singleton),
+  email text not null check (email = lower(trim(email)) and email <> ''),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.spend_owner enable row level security;
+
+create or replace function public.configure_spend_owner(p_email text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare normalized_email text := lower(trim(p_email));
+begin
+  if normalized_email is null or normalized_email = '' then
+    raise exception 'Spend owner email is required';
+  end if;
+  if (select count(*) from auth.users) > 1 then
+    raise exception 'This Supabase project already has multiple Auth users';
+  end if;
+  if exists (select 1 from auth.users where lower(email) <> normalized_email or email is null) then
+    raise exception 'This Supabase project belongs to a different Auth user';
+  end if;
+  insert into public.spend_owner (singleton, email, updated_at)
+  values (true, normalized_email, now())
+  on conflict (singleton) do update set email = excluded.email, updated_at = excluded.updated_at;
+end;
+$$;
+
+create or replace function public.enforce_spend_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare owner_email text;
+begin
+  select email into owner_email from public.spend_owner where singleton = true;
+  if owner_email is null then
+    raise exception 'This private Spend database has not finished owner setup';
+  end if;
+  if new.email is null or lower(trim(new.email)) <> owner_email then
+    raise exception 'This private Spend database only accepts its owner email';
+  end if;
+  if exists (select 1 from auth.users where id <> new.id) then
+    raise exception 'This private Spend database already has an owner';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_spend_owner_on_auth_users on auth.users;
+create trigger enforce_spend_owner_on_auth_users
+before insert or update on auth.users
+for each row execute function public.enforce_spend_owner();
+
+revoke all on table public.spend_owner from public, anon, authenticated;
+revoke all on function public.configure_spend_owner(text) from public, anon, authenticated;
+revoke all on function public.enforce_spend_owner() from public, anon, authenticated;
+
 create table if not exists public.tracker_collections (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,

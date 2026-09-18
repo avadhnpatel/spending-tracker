@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendMagicLink: async (email: string) => {
         if (!supabase) throw new Error('Supabase is not configured')
         const { error } = await supabase.auth.signInWithOtp({
-          email,
+          email: email.trim().toLowerCase(),
           options: {
             emailRedirectTo: authRedirectUrl(),
             shouldCreateUser: true,

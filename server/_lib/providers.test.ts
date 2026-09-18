@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { providerErrorMessage, vercelProjectNameCandidates } from './providers'
+import { providerErrorMessage, spendOwnerConfigurationSql, vercelProjectNameCandidates } from './providers'
 
 describe('providerErrorMessage', () => {
   it('extracts messages from nested provider errors', () => {
@@ -24,5 +24,16 @@ describe('vercelProjectNameCandidates', () => {
         'spend-private-12345678abcd-4',
         'spend-private-12345678abcd-5',
       ])
+  })
+})
+
+describe('spendOwnerConfigurationSql', () => {
+  it('normalizes and safely quotes the verified directory email', () => {
+    expect(spendOwnerConfigurationSql("  Owner.O'Brien@Example.COM "))
+      .toBe("select public.configure_spend_owner('owner.o''brien@example.com');")
+  })
+
+  it('requires an owner before a private schema can be installed', () => {
+    expect(() => spendOwnerConfigurationSql(null)).toThrow('owner email is missing')
   })
 })

@@ -98,19 +98,33 @@ export async function savePrivateApp(session: SetupSession): Promise<void> {
   if (!session.directory_user_id || !session.directory_email || !session.deployment_url || !session.supabase_project_ref || !session.supabase_publishable_key) {
     throw new Error('Private app details are incomplete')
   }
-  await dbRequest<PrivateApp[]>('private_apps', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({
-      directory_user_id: session.directory_user_id,
-      email: session.directory_email.toLowerCase(),
-      deployment_url: session.deployment_url,
-      supabase_project_ref: session.supabase_project_ref,
-      supabase_publishable_key: session.supabase_publishable_key,
-      vercel_project_id: session.vercel_project_id,
-      repository_full_name: session.repository_full_name,
-      updated_at: new Date().toISOString(),
-    }),
+  const email = session.directory_email.trim().toLowerCase()
+  const [projectRows, emailRows] = await Promise.all([
+    dbRequest<PrivateApp[]>(`private_apps?supabase_project_ref=eq.${encodeURIComponent(session.supabase_project_ref)}&select=*`),
+    dbRequest<PrivateApp[]>(`private_apps?email=eq.${encodeURIComponent(email)}&select=*`),
+  ])
+  const projectOwner = projectRows[0]
+  if (projectOwner && projectOwner.email.toLowerCase() !== email) {
+    throw new Error('That Supabase project is already linked to another Spending Tracker account')
+  }
+
+  const existing = projectOwner ?? emailRows[0]
+  const app = {
+    directory_user_id: session.directory_user_id,
+    email,
+    deployment_url: session.deployment_url,
+    supabase_project_ref: session.supabase_project_ref,
+    supabase_publishable_key: session.supabase_publishable_key,
+    vercel_project_id: session.vercel_project_id,
+    repository_full_name: session.repository_full_name,
+    updated_at: new Date().toISOString(),
+  }
+  await dbRequest<PrivateApp[]>(existing
+    ? `private_apps?directory_user_id=eq.${encodeURIComponent(existing.directory_user_id)}`
+    : 'private_apps', {
+    method: existing ? 'PATCH' : 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify(app),
   })
 }
 

@@ -90,9 +90,16 @@ export async function createSupabaseProject(session: SetupSession, organizationS
   }
 }
 
+export function spendOwnerConfigurationSql(email: string | null): string {
+  const normalized = email?.trim().toLowerCase()
+  if (!normalized) throw new Error('The private Spend owner email is missing')
+  return `select public.configure_spend_owner('${normalized.replaceAll("'", "''")}');`
+}
+
 export async function applySpendSchema(session: SetupSession): Promise<void> {
   if (!session.supabase_project_ref) throw new Error('Supabase project is missing')
-  const query = await readFile(join(process.cwd(), 'supabase/schema.sql'), 'utf8')
+  const schema = await readFile(join(process.cwd(), 'supabase/schema.sql'), 'utf8')
+  const query = `${schema}\n${spendOwnerConfigurationSql(session.directory_email)}`
   await providerRequest(`https://api.supabase.com/v1/projects/${session.supabase_project_ref}/database/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${supabaseToken(session)}`, 'Content-Type': 'application/json' },
