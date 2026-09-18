@@ -65,7 +65,7 @@ export function AccountPage() {
     setMessage(error ? error.message : 'Check your email for a secure sign-in link.')
   }
 
-  async function startSetupManually() {
+  async function startSetupManually(replace = false) {
     if (!directoryAccessToken) return
     setBusy(true)
     setMessage('Starting your private setup…')
@@ -74,7 +74,10 @@ export function AccountPage() {
         await startPrivateSetup(directoryAccessToken)
         return
       }
-      await directoryRequest('/api/directory/start-setup', directoryAccessToken, { method: 'POST' })
+      await directoryRequest('/api/directory/start-setup', directoryAccessToken, {
+        method: 'POST',
+        body: JSON.stringify(replace ? { replace: true } : {}),
+      })
       navigate('/setup')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not start private setup')
@@ -122,7 +125,7 @@ export function AccountPage() {
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
-  if (app && recoveryRequested) return <GatewayShell><p className="mt-3 text-stone-600">Reconnect {email || 'this account'} to the Supabase project that contains your existing Spend data.</p><p className="mt-2 text-sm leading-6 text-stone-500">Your current project will not be deleted or changed. The account link is updated only after you choose and successfully configure an existing project.</p><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Choose an existing Supabase project</button><button type="button" onClick={() => window.location.replace('/account')} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Keep using the current project</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
+  if (app && recoveryRequested) return <GatewayShell><p className="mt-3 text-stone-600">Reconnect {email || 'this account'} to the Supabase project that contains your existing Spend data.</p><p className="mt-2 text-sm leading-6 text-stone-500">Choose an existing project to recover it, or intentionally replace the current link with a new private database.</p><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Choose an existing Supabase project</button><button type="button" onClick={() => void startSetupManually(true)} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Create a new private database</button><button type="button" onClick={() => window.location.replace('/account')} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Keep using the current project</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
   if (!app) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">If you already own a Spend project, recover it without creating anything. Otherwise, create a new private database.</p><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Recover my existing database</button><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
   return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }
