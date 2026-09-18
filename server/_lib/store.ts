@@ -67,7 +67,31 @@ export async function privateAppForUser(userId: string, email?: string): Promise
   // email has just been verified by the control-plane Supabase project, so an
   // exact email match is a safe recovery path for that owner's private app.
   const matchingEmail = await dbRequest<PrivateApp[]>(`private_apps?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=*`)
-  return matchingEmail[0] ?? null
+  if (matchingEmail[0]) return matchingEmail[0]
+
+  // If an earlier completed installation wrote its durable session but was
+  // interrupted before the directory row was created, rebuild that mapping.
+  // Both records are bound to the same verified directory email.
+  const completed = await dbRequest<Array<Pick<SetupSession, 'deployment_url' | 'supabase_project_ref' | 'supabase_publishable_key' | 'vercel_project_id' | 'repository_full_name'>>>(
+    `provisioning_sessions?directory_email=eq.${encodeURIComponent(email.trim().toLowerCase())}&status=eq.complete&supabase_project_ref=not.is.null&supabase_publishable_key=not.is.null&order=updated_at.desc&limit=1&select=deployment_url,supabase_project_ref,supabase_publishable_key,vercel_project_id,repository_full_name`,
+  )
+  const recovered = completed[0]
+  if (!recovered?.deployment_url || !recovered.supabase_project_ref || !recovered.supabase_publishable_key) return null
+  const app: PrivateApp = {
+    directory_user_id: userId,
+    email: email.trim().toLowerCase(),
+    deployment_url: recovered.deployment_url,
+    supabase_project_ref: recovered.supabase_project_ref,
+    supabase_publishable_key: recovered.supabase_publishable_key,
+    vercel_project_id: recovered.vercel_project_id,
+    repository_full_name: recovered.repository_full_name,
+  }
+  await dbRequest<PrivateApp[]>('private_apps', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ ...app, updated_at: new Date().toISOString() }),
+  })
+  return app
 }
 
 export async function savePrivateApp(session: SetupSession): Promise<void> {
