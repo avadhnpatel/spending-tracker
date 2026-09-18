@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTrackers } from '../context/TrackerContext'
 import { downloadCsv, transactionsToCsv } from '../lib/csv'
+import { directorySupabase } from '../lib/directory'
 import { getDataFootprint, listCategories, listTransactions, purgeReviewedImportCandidates, type DataFootprint } from '../lib/queries'
+import { clearRuntimeSupabaseConfig } from '../lib/runtime-config'
 import {
   applyTheme,
   getThemePreference,
@@ -21,6 +23,8 @@ export function MorePage() {
   const [storageBusy, setStorageBusy] = useState(false)
   const [storageNotice, setStorageNotice] = useState<string | null>(null)
   const [storageError, setStorageError] = useState<string | null>(null)
+  const [switchingAccount, setSwitchingAccount] = useState(false)
+  const [switchError, setSwitchError] = useState<string | null>(null)
 
   useEffect(() => {
     applyTheme(theme)
@@ -67,6 +71,23 @@ export function MorePage() {
       setStorageError(err instanceof Error ? err.message : 'Could not clean import history')
     } finally {
       setStorageBusy(false)
+    }
+  }
+
+  async function switchPrivateAccount() {
+    setSwitchingAccount(true)
+    setSwitchError(null)
+    try {
+      await signOut()
+      if (directorySupabase) {
+        const { error } = await directorySupabase.auth.signOut()
+        if (error) throw error
+      }
+      await clearRuntimeSupabaseConfig()
+      window.location.replace('/account')
+    } catch (error) {
+      setSwitchError(error instanceof Error ? error.message : 'Could not switch private accounts')
+      setSwitchingAccount(false)
     }
   }
 
@@ -164,6 +185,19 @@ export function MorePage() {
           <span className="block text-sm font-normal text-stone-500">Download this tracker’s transactions</span>
         </span>
       </button>
+      <button
+        type="button"
+        onClick={() => void switchPrivateAccount()}
+        disabled={switchingAccount}
+        className="flex min-h-16 w-full items-center gap-3 rounded-3xl bg-white px-4 py-4 text-left font-medium shadow-sm disabled:opacity-50"
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-stone-100 text-lg">⇄</span>
+        <span className="min-w-0 flex-1">
+          Switch private account
+          <span className="block text-sm font-normal text-stone-500">Sign in with another email and open its private database</span>
+        </span>
+      </button>
+      {switchError ? <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{switchError}</p> : null}
       <button
         type="button"
         onClick={() => void signOut()}
