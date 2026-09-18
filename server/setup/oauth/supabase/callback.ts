@@ -35,7 +35,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       supabase_refresh_token_encrypted: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : null,
       supabase_oauth_state: null,
       supabase_pkce_verifier_encrypted: null,
-      status: 'connecting',
+      status: session.status === 'recover_project' ? 'recover_project' : 'connecting',
       error_message: null,
     })
     response.redirect(302, '/setup?connected=supabase')

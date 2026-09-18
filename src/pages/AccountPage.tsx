@@ -82,6 +82,20 @@ export function AccountPage() {
     }
   }
 
+  async function recoverExistingProject() {
+    if (!directoryAccessToken) return
+    setBusy(true)
+    setMessage('Preparing recovery…')
+    try {
+      await directoryRequest('/api/directory/recover', directoryAccessToken, { method: 'POST' })
+      navigate('/setup')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not start project recovery')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function changeDirectoryEmail() {
     if (!directorySupabase) return
     setBusy(true)
@@ -107,7 +121,7 @@ export function AccountPage() {
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
-  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">Set up a new private database only if this email should own one. To access an existing shared tracker, return to its normal Spend sign-in screen instead.</p><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
+  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">If you already own a Spend project, recover it without creating anything. Otherwise, create a new private database.</p><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Recover my existing database</button><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
   return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }
 

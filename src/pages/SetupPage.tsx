@@ -12,6 +12,7 @@ type SetupSession = {
 }
 
 type SupabaseOrganization = { id: string; slug: string; name: string }
+type SupabaseProject = { ref: string; name: string }
 type SupabaseRegionGroup = 'americas' | 'emea' | 'apac'
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -31,7 +32,9 @@ export function SetupPage() {
   const [session, setSession] = useState<SetupSession | null>(null)
   const [busy, setBusy] = useState(false)
   const [organizations, setOrganizations] = useState<SupabaseOrganization[]>([])
+  const [projects, setProjects] = useState<SupabaseProject[]>([])
   const [organizationSlug, setOrganizationSlug] = useState('')
+  const [existingProjectRef, setExistingProjectRef] = useState('')
   const [projectName, setProjectName] = useState('spend-private')
   const [regionGroup, setRegionGroup] = useState<SupabaseRegionGroup>('americas')
   const [error, setError] = useState<string | null>(() => new URLSearchParams(location.search).get('error'))
@@ -60,9 +63,11 @@ export function SetupPage() {
     if (!session?.connections.supabase) return
     async function loadOptions() {
       try {
-        const result = await readJson<{ organizations: SupabaseOrganization[] }>(await fetch('/api/setup/options'))
+        const result = await readJson<{ organizations: SupabaseOrganization[]; projects: SupabaseProject[] }>(await fetch('/api/setup/options'))
         setOrganizations(result.organizations)
+        setProjects(result.projects)
         setOrganizationSlug((current) => current || result.organizations[0]?.slug || '')
+        setExistingProjectRef((current) => current || result.projects.find((project) => project.name.startsWith('spend-private'))?.ref || result.projects[0]?.ref || '')
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not load Supabase organizations')
       }
@@ -77,7 +82,7 @@ export function SetupPage() {
       const response = await fetch('/api/setup/provision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationSlug, projectName, regionGroup }),
+        body: JSON.stringify({ organizationSlug, projectName, regionGroup, existingProjectRef }),
       })
       const next = await readJson<SetupSession>(response)
       setSession(next)
@@ -93,14 +98,15 @@ export function SetupPage() {
   }
 
   const connected = Boolean(session?.connections.supabase)
+  const recovering = session?.status === 'recover_project'
 
   return (
     <main className="mx-auto min-h-dvh w-full max-w-2xl px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))] sm:px-6">
       <header className="mb-7">
         <a href="/account" className="inline-flex min-h-11 items-center text-sm font-semibold text-teal-800">← Back to Spend</a>
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.28em] text-teal-700">Private Spend setup</p>
-        <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">Your data, in a project you own.</h1>
-        <p className="mt-3 max-w-xl leading-7 text-stone-500">Connect Supabase once. Spend creates your private database and sign-in system, while the app continues to run securely at spendingtrkr.com.</p>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">{recovering ? 'Reconnect your existing project.' : 'Your data, in a project you own.'}</h1>
+        <p className="mt-3 max-w-xl leading-7 text-stone-500">{recovering ? 'Choose the Supabase project you already own. Spend will restore its link without creating a new project.' : 'Connect Supabase once. Spend creates your private database and sign-in system, while the app continues to run securely at spendingtrkr.com.'}</p>
       </header>
 
       <section className="mb-5 rounded-3xl bg-stone-900 p-5 text-white shadow-xl shadow-stone-900/10">
@@ -125,9 +131,14 @@ export function SetupPage() {
 
           {connected && session.status !== 'complete' ? (
             <section className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
-              <p className="font-semibold text-teal-950">Create your private Spend database</p>
-              <p className="mt-1 text-sm leading-6 text-teal-900">Choose its location. Setup is resumable and usually takes a few minutes.</p>
+              <p className="font-semibold text-teal-950">{recovering ? 'Recover your private Spend database' : 'Create your private Spend database'}</p>
+              <p className="mt-1 text-sm leading-6 text-teal-900">{recovering ? 'Select the project that already contains your Spend data. No new Supabase project will be created.' : 'Choose its location. Setup is resumable and usually takes a few minutes.'}</p>
               <div className="mt-4 space-y-3">
+                {recovering ? <label className="block text-sm font-semibold text-teal-950">Existing Supabase project
+                  <select value={existingProjectRef} onChange={(event) => setExistingProjectRef(event.target.value)} disabled={busy} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">
+                    {projects.map((project) => <option key={project.ref} value={project.ref}>{project.name}</option>)}
+                  </select>
+                </label> : <>
                 <label className="block text-sm font-semibold text-teal-950">Supabase organization
                   <select value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">
                     {organizations.map((organization) => <option key={organization.id} value={organization.slug}>{organization.name}</option>)}
@@ -142,8 +153,8 @@ export function SetupPage() {
                     <option value="emea">Europe, Middle East, and Africa</option>
                     <option value="apac">Asia Pacific</option>
                   </select>
-                </label>
-                <button type="button" onClick={() => void provision()} disabled={busy || !organizationSlug} className="min-h-12 w-full rounded-xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-50">{busy ? setupStatusLabel(session.status) : session.supabaseProjectRef ? 'Resume setup' : 'Create my private app'}</button>
+                </label></>}
+                <button type="button" onClick={() => void provision()} disabled={busy || (recovering ? !existingProjectRef : !organizationSlug)} className="min-h-12 w-full rounded-xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-50">{busy ? setupStatusLabel(session.status) : recovering ? 'Reconnect this project' : session.supabaseProjectRef ? 'Resume setup' : 'Create my private app'}</button>
               </div>
             </section>
           ) : null}

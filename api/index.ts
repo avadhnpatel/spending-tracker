@@ -1,4 +1,5 @@
 import directoryMe from '../server/directory/me.js'
+import directoryRecover from '../server/directory/recover.js'
 import directoryStartSetup from '../server/directory/start-setup.js'
 import mobileActivate from '../server/setup/mobile/activate.js'
 import mobileClaim from '../server/setup/mobile/claim.js'
@@ -14,6 +15,7 @@ type Handler = (request: ApiRequest, response: ApiResponse) => Promise<void>
 
 const routes: Record<string, Handler> = {
   'directory/me': directoryMe,
+  'directory/recover': directoryRecover,
   'directory/start-setup': directoryStartSetup,
   'setup/session': session,
   'setup/options': options,

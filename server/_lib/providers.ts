@@ -57,6 +57,7 @@ function githubToken(session: SetupSession): string {
 }
 
 export type SupabaseOrganization = { id: string; slug: string; name: string }
+export type SupabaseProject = { ref: string; name: string }
 
 export async function listSupabaseOrganizations(session: SetupSession): Promise<SupabaseOrganization[]> {
   return providerRequest('https://api.supabase.com/v1/organizations', {
@@ -64,10 +65,14 @@ export async function listSupabaseOrganizations(session: SetupSession): Promise<
   })
 }
 
-export async function createSupabaseProject(session: SetupSession, organizationSlug: string, name: string, regionGroup: SupabaseRegionGroup) {
-  const projects = await providerRequest<Array<{ ref: string; name: string }>>('https://api.supabase.com/v1/projects', {
+export async function listSupabaseProjects(session: SetupSession): Promise<SupabaseProject[]> {
+  return providerRequest<SupabaseProject[]>('https://api.supabase.com/v1/projects', {
     headers: { Authorization: `Bearer ${supabaseToken(session)}` },
   })
+}
+
+export async function createSupabaseProject(session: SetupSession, organizationSlug: string, name: string, regionGroup: SupabaseRegionGroup) {
+  const projects = await listSupabaseProjects(session)
   const existing = projects.find((project) => project.name === name)
   if (existing) return existing
 
@@ -79,9 +84,7 @@ export async function createSupabaseProject(session: SetupSession, organizationS
       body: JSON.stringify(supabaseProjectBody(organizationSlug, name, dbPass, regionGroup)),
     })
   } catch (error) {
-    const recovered = (await providerRequest<Array<{ ref: string; name: string }>>('https://api.supabase.com/v1/projects', {
-      headers: { Authorization: `Bearer ${supabaseToken(session)}` },
-    })).find((project) => project.name === name)
+    const recovered = (await listSupabaseProjects(session)).find((project) => project.name === name)
     if (recovered) return recovered
     throw error
   }

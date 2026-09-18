@@ -1,16 +1,17 @@
 import { allowMethods, publicError, setupBaseUrl } from '../_lib/http.js'
-import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, deploySpendFunction, getSupabasePublishableKey } from '../_lib/providers.js'
+import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, deploySpendFunction, getSupabasePublishableKey, listSupabaseProjects } from '../_lib/providers.js'
 import { claimProvisioningStep, finishProvisioningStep, publicSession, savePrivateApp, sessionFromRequest } from '../_lib/store.js'
 import { parseSupabaseRegionGroup, resumableSupabaseProjectName } from '../_lib/supabase-project.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
 
-type Input = { organizationSlug?: string; projectName?: string; regionGroup?: string }
+type Input = { organizationSlug?: string; projectName?: string; regionGroup?: string; existingProjectRef?: string }
 
 function ready(session: SetupSession): boolean {
   return Boolean(session.supabase_token_encrypted)
 }
 
 function normalizedStep(session: SetupSession, claimedStep: string): string {
+  if (claimedStep === 'recover_project' && !session.supabase_project_ref) return 'recover_project'
   if (!session.supabase_project_ref) return 'ready_to_provision'
   if (claimedStep === 'connecting' || claimedStep === 'creating_supabase') return 'applying_schema'
   if (['configuring_supabase', 'linking_vercel', 'deploying'].includes(claimedStep)) return 'applying_schema'
@@ -29,7 +30,16 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   const step = normalizedStep(claim.session, claim.step)
   try {
     const input = (request.body ?? {}) as Input
-    if (step === 'ready_to_provision') {
+    if (step === 'recover_project') {
+      const projectRef = input.existingProjectRef?.trim()
+      if (!projectRef) {
+        session = await finishProvisioningStep(claim, { status: 'recover_project', error_message: 'Choose the existing Supabase project to recover' })
+        return response.status(400).json({ error: 'Choose the existing Supabase project to recover', session: publicSession(session) })
+      }
+      const project = (await listSupabaseProjects(claim.session)).find((candidate) => candidate.ref === projectRef)
+      if (!project) throw new Error('That Supabase project is not available to this account')
+      session = await finishProvisioningStep(claim, { supabase_project_ref: project.ref, status: 'applying_schema' })
+    } else if (step === 'ready_to_provision') {
       const organizationSlug = input.organizationSlug?.trim()
       const projectName = resumableSupabaseProjectName(input.projectName?.trim() || 'spend-private', claim.session.id)
       if (!organizationSlug) {
