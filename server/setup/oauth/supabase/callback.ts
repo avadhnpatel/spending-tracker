@@ -29,16 +29,17 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     })
     const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; error_description?: string }
     if (!tokens.access_token) throw new Error(tokens.error_description || 'Supabase did not return an access token')
+    const plaidSetup = session.status === 'plaid_connecting'
     await updateSession(session.id, {
       supabase_connected_at: new Date().toISOString(),
       supabase_token_encrypted: encryptSecret(tokens.access_token),
       supabase_refresh_token_encrypted: tokens.refresh_token ? encryptSecret(tokens.refresh_token) : null,
       supabase_oauth_state: null,
       supabase_pkce_verifier_encrypted: null,
-      status: session.status === 'recover_project' ? 'recover_project' : 'connecting',
+      status: plaidSetup ? 'plaid_connected' : session.status === 'recover_project' ? 'recover_project' : 'connecting',
       error_message: null,
     })
-    response.redirect(302, '/setup?connected=supabase')
+    response.redirect(302, plaidSetup ? '/account?plaid=connected' : '/setup?connected=supabase')
   } catch (error) {
     response.redirect(302, `/setup?error=${encodeURIComponent(publicError(error))}`)
   }

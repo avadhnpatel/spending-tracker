@@ -4,11 +4,21 @@ The frontend never receives Plaid secrets or Plaid access tokens. `PLAID_CLIENT_
 `PLAID_SECRET` are Supabase Edge Function secrets. Per-user access tokens are stored in
 `financial_connections`, which has RLS enabled and no client policies.
 
-## Plaid Dashboard
+## User setup in Spend
+
+On the shared Spend website, a private-project owner can open **Account → Enable
+Plaid bank sync**. They reauthorize their Supabase account, enter their Plaid Client ID
+and Secret, and Spend validates the pair before writing it directly to their project's
+Edge Function secrets. The credentials are not saved in Spend's provisioning database
+or Vercel. The owner must add this redirect URI to their Plaid application:
+
+`https://spendingtrkr.com/import`
+
+## Manual operator setup
 
 1. Start the free Trial plan and enable Transactions.
 2. Add this redirect URI to the Plaid application:
-   `https://spending-tracker-bice-omega.vercel.app/more/import`
+   `https://spendingtrkr.com/import`
 3. Copy the Client ID and Production secret from Developers → Keys.
 
 ## Supabase secrets

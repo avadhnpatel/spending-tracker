@@ -118,6 +118,51 @@ export async function getSupabasePublishableKey(session: SetupSession): Promise<
   return key
 }
 
+type PlaidEnvironment = 'sandbox' | 'development' | 'production'
+
+function plaidBaseUrl(environment: PlaidEnvironment): string {
+  return environment === 'sandbox'
+    ? 'https://sandbox.plaid.com'
+    : environment === 'development'
+      ? 'https://development.plaid.com'
+      : 'https://production.plaid.com'
+}
+
+/**
+ * The credentials are validated before being sent to the user's Supabase
+ * project. They are deliberately never stored in the provisioning database.
+ */
+export async function setPlaidSecrets(session: SetupSession, input: { clientId: string; secret: string; environment: PlaidEnvironment; redirectUri: string }): Promise<void> {
+  if (!session.supabase_project_ref || !session.directory_user_id) throw new Error('Your private Supabase project is unavailable')
+  const check = await fetch(`${plaidBaseUrl(input.environment)}/link/token/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: input.clientId,
+      secret: input.secret,
+      client_name: 'Spend setup check',
+      products: ['transactions'],
+      country_codes: ['US'],
+      language: 'en',
+      user: { client_user_id: session.directory_user_id },
+    }),
+  })
+  if (!check.ok) {
+    const body = await check.json().catch(() => ({})) as { display_message?: string; error_message?: string }
+    throw new Error(body.display_message || body.error_message || 'Plaid could not verify those credentials')
+  }
+  await providerRequest(`https://api.supabase.com/v1/projects/${session.supabase_project_ref}/secrets`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${supabaseToken(session)}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify([
+      { name: 'PLAID_CLIENT_ID', value: input.clientId },
+      { name: 'PLAID_SECRET', value: input.secret },
+      { name: 'PLAID_ENV', value: input.environment },
+      { name: 'PLAID_REDIRECT_URI', value: input.redirectUri },
+    ]),
+  })
+}
+
 export const spendFunctionSlugs = ['plaid-link-token', 'plaid-exchange', 'plaid-sync'] as const
 export type SpendFunctionSlug = typeof spendFunctionSlugs[number]
 
