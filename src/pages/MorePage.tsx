@@ -171,6 +171,7 @@ export function MorePage() {
         <Row icon="◉" to="/more/categories" label="Categories & budgets" hint="Organize spending and set targets" />
         <Row icon="↻" to="/more/recurring" label="Recurring" hint="Bills and subscriptions" />
         <Row icon="⇩" to="/import" label="Import transactions" hint="CSV statements and automatic bank sync" />
+        <Row icon="⟳" to="/account?recover=1" label="Reconnect database" hint="Choose an existing Supabase project without deleting data" />
         <Row icon="↗" to="/setup" label="Create a private copy" hint="Set up Spend for a friend" />
       </div>
       <button
