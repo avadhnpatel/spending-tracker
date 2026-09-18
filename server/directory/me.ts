@@ -7,7 +7,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   if (!allowMethods(request, response, ['GET'])) return
   try {
     const user = await directoryUserFromRequest(request)
-    response.status(200).json({ email: user.email, app: await privateAppForUser(user.id) })
+    response.status(200).json({ email: user.email, app: await privateAppForUser(user.id, user.email) })
   } catch (error) {
     response.status(401).json({ error: publicError(error) })
   }

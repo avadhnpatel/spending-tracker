@@ -60,9 +60,14 @@ export async function createMobileSession(owner?: { id: string; email: string })
   return { session, browserToken, claimCode }
 }
 
-export async function privateAppForUser(userId: string): Promise<PrivateApp | null> {
+export async function privateAppForUser(userId: string, email?: string): Promise<PrivateApp | null> {
   const rows = await dbRequest<PrivateApp[]>(`private_apps?directory_user_id=eq.${encodeURIComponent(userId)}&select=*`)
-  return rows[0] ?? null
+  if (rows[0] || !email) return rows[0] ?? null
+  // Older directory rows can predate a recreated directory Auth user. The
+  // email has just been verified by the control-plane Supabase project, so an
+  // exact email match is a safe recovery path for that owner's private app.
+  const matchingEmail = await dbRequest<PrivateApp[]>(`private_apps?email=eq.${encodeURIComponent(email.trim().toLowerCase())}&select=*`)
+  return matchingEmail[0] ?? null
 }
 
 export async function savePrivateApp(session: SetupSession): Promise<void> {

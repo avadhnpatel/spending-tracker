@@ -24,6 +24,7 @@ export function AccountPage() {
   const [directoryAccessToken, setDirectoryAccessToken] = useState<string | null>(null)
   const setupStarted = useRef(false)
   const appOpened = useRef(false)
+  const setupCancelled = new URLSearchParams(window.location.search).get('cancelSetup') === '1'
 
   useEffect(() => {
     async function load() {
@@ -45,7 +46,7 @@ export function AccountPage() {
 
   useEffect(() => {
     const accessToken = directoryAccessToken
-    if (!sessionReady || !accessToken || app || setupStarted.current) return
+    if (!sessionReady || !accessToken || app || setupStarted.current || setupCancelled) return
     const verifiedAccessToken: string = accessToken
     setupStarted.current = true
 
@@ -67,7 +68,7 @@ export function AccountPage() {
     }
 
     void continuePrivateSetup()
-  }, [app, directoryAccessToken, navigate, sessionReady])
+  }, [app, directoryAccessToken, navigate, sessionReady, setupCancelled])
 
   useEffect(() => {
     if (!app || appOpened.current) return
@@ -91,6 +92,32 @@ export function AccountPage() {
     setMessage(error ? error.message : 'Check your email for a secure sign-in link.')
   }
 
+  async function startSetupManually() {
+    if (!directoryAccessToken) return
+    setBusy(true)
+    setMessage('Starting your private setup…')
+    try {
+      await directoryRequest('/api/directory/start-setup', directoryAccessToken, { method: 'POST' })
+      navigate('/setup')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not start private setup')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function changeDirectoryEmail() {
+    if (!directorySupabase) return
+    setBusy(true)
+    const { error } = await directorySupabase.auth.signOut()
+    if (error) {
+      setMessage(error.message)
+      setBusy(false)
+      return
+    }
+    window.location.replace('/account')
+  }
+
   if (!directorySupabase) return <GatewayShell><p className="text-red-700">This gateway is not configured yet. Add the directory Supabase URL and publishable key to this deployment.</p></GatewayShell>
   if (!sessionReady) return <GatewayShell><p className="text-stone-500">Loading your account…</p></GatewayShell>
   if (!directoryAccessToken) return (
@@ -104,6 +131,7 @@ export function AccountPage() {
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
+  if (!app && setupCancelled) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">Set up a new private database only if this email should own one. To access an existing shared tracker, return to its normal Spend sign-in screen instead.</p><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
   if (!app) return <GatewayShell><p className="mt-3 text-stone-600">Preparing your private setup…</p><p className="mt-2 text-sm leading-6 text-stone-500">Next, you’ll connect Supabase so Spend can create the private database you own.</p>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}{!busy && message ? <button type="button" onClick={() => { setupStarted.current = false; setSessionReady(false); window.setTimeout(() => setSessionReady(true), 0) }} className="mt-5 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900">Try again</button> : null}</GatewayShell>
   return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }

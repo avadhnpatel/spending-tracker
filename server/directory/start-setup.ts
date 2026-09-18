@@ -7,7 +7,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   if (!allowMethods(request, response, ['POST'])) return
   try {
     const user = await directoryUserFromRequest(request)
-    const app = await privateAppForUser(user.id)
+    const app = await privateAppForUser(user.id, user.email)
     if (app) return response.status(409).json({ error: 'You already have a private Spending Tracker app', app })
     response.status(201).json(publicSession(await createSession(response, user)))
   } catch (error) {
