@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { startPrivateSetup } from '../lib/mobile-onboarding'
 import { isNativePlatform } from '../lib/platform'
 
 export function LoginPage() {
@@ -28,14 +27,7 @@ export function LoginPage() {
 
   async function beginPrivateSetup() {
     setSetupBusy(true)
-    setMessage('')
-    try {
-      await startPrivateSetup()
-    } catch (error) {
-      setStatus('error')
-      setMessage(error instanceof Error ? error.message : 'Could not start private setup')
-      setSetupBusy(false)
-    }
+    window.location.replace('/account')
   }
 
   return (
