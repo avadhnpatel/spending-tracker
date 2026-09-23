@@ -12,13 +12,13 @@ and Secret, and Spend validates the pair before writing it directly to their pro
 Edge Function secrets. The credentials are not saved in Spend's provisioning database
 or Vercel. The owner must add this redirect URI to their Plaid application:
 
-`https://spendingtrkr.com/import`
+`https://www.spendingtrkr.com/import`
 
 ## Manual operator setup
 
 1. Start the free Trial plan and enable Transactions.
 2. Add this redirect URI to the Plaid application:
-   `https://spendingtrkr.com/import`
+   `https://www.spendingtrkr.com/import`
 3. Copy the Client ID and Production secret from Developers → Keys.
 
 ## Supabase secrets
@@ -30,7 +30,7 @@ npx supabase secrets set \
   PLAID_CLIENT_ID=... \
   PLAID_SECRET=... \
   PLAID_ENV=production \
-  PLAID_REDIRECT_URI=https://spending-tracker-bice-omega.vercel.app/more/import \
+  PLAID_REDIRECT_URI=https://www.spendingtrkr.com/import \
   PLAID_CRON_SECRET=use-a-long-random-value \
   --project-ref xbdnhcehyfxbqwloctmt
 ```

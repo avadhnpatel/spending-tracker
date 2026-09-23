@@ -1,4 +1,4 @@
-import { clearSessionCookie, allowMethods, publicError, setupBaseUrl } from '../../_lib/http.js'
+import { clearSessionCookie, allowMethods, plaidRedirectUri, publicError } from '../../_lib/http.js'
 import { setPlaidSecrets } from '../../_lib/providers.js'
 import { privateAppForUser, sessionFromRequest, updateSession } from '../../_lib/store.js'
 import type { ApiRequest, ApiResponse } from '../../_lib/types.js'
@@ -18,14 +18,14 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const clientId = typeof input.clientId === 'string' ? input.clientId.trim() : ''
     const secret = typeof input.secret === 'string' ? input.secret.trim() : ''
     const environment = input.environment
-    if (!clientId || !secret || !['sandbox', 'development', 'production'].includes(String(environment))) {
+    if (!clientId || !secret || !['sandbox', 'production'].includes(String(environment))) {
       throw new Error('Enter a Plaid Client ID, Secret, and environment')
     }
     await setPlaidSecrets(session, {
       clientId,
       secret,
-      environment: environment as 'sandbox' | 'development' | 'production',
-      redirectUri: `${setupBaseUrl()}/import`,
+      environment: environment as 'sandbox' | 'production',
+      redirectUri: plaidRedirectUri(),
     })
     await updateSession(session.id, {
       status: 'complete',

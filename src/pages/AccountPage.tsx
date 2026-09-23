@@ -11,14 +11,14 @@ export function AccountPage() {
   const plaidSetup = new URLSearchParams(location.search).get('plaid') === 'connected'
   const plaidRequested = plaidSetup || new URLSearchParams(location.search).get('plaid') === '1'
   const [email, setEmail] = useState('')
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(() => new URLSearchParams(location.search).get('error') ?? '')
   const [busy, setBusy] = useState(false)
   const [app, setApp] = useState<DirectoryPrivateApp | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
   const [directoryAccessToken, setDirectoryAccessToken] = useState<string | null>(null)
   const [plaidClientId, setPlaidClientId] = useState('')
   const [plaidSecret, setPlaidSecret] = useState('')
-  const [plaidEnvironment, setPlaidEnvironment] = useState<'sandbox' | 'development' | 'production'>('production')
+  const [plaidEnvironment, setPlaidEnvironment] = useState<'sandbox' | 'production'>('production')
   const appOpened = useRef(false)
 
   useEffect(() => {
@@ -153,9 +153,9 @@ export function AccountPage() {
   if (app && plaidSetup) return (
     <GatewayShell>
       <p className="mt-3 text-stone-600">Enable bank sync with your own Plaid account.</p>
-      <p className="mt-2 text-sm leading-6 text-stone-500">Your credentials are checked once, then written directly to your private Supabase Edge Function secrets. Spend never stores them. In your Plaid Dashboard, add <span className="font-medium text-stone-700">https://spendingtrkr.com/import</span> as an allowed redirect URI.</p>
+      <p className="mt-2 text-sm leading-6 text-stone-500">Your credentials are checked once, then written directly to your private Supabase Edge Function secrets. Spend never stores them. In your Plaid Dashboard, add <span className="font-medium text-stone-700">https://www.spendingtrkr.com/import</span> as an allowed redirect URI.</p>
       <form onSubmit={savePlaidSetup} className="mt-6 space-y-3">
-        <label className="block text-sm font-medium text-stone-700">Plaid environment<select value={plaidEnvironment} onChange={(event) => setPlaidEnvironment(event.target.value as typeof plaidEnvironment)} className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700"><option value="production">Production</option><option value="development">Development</option><option value="sandbox">Sandbox</option></select></label>
+        <label className="block text-sm font-medium text-stone-700">Plaid environment<select value={plaidEnvironment} onChange={(event) => setPlaidEnvironment(event.target.value as typeof plaidEnvironment)} className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700"><option value="production">Production</option><option value="sandbox">Sandbox</option></select></label>
         <label className="block text-sm font-medium text-stone-700">Client ID<input required autoCapitalize="none" autoComplete="off" value={plaidClientId} onChange={(event) => setPlaidClientId(event.target.value)} className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700" /></label>
         <label className="block text-sm font-medium text-stone-700">Secret<input required type="password" autoComplete="new-password" value={plaidSecret} onChange={(event) => setPlaidSecret(event.target.value)} className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700" /></label>
         <button disabled={busy} className="min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">{busy ? 'Saving…' : 'Verify and enable Plaid'}</button>

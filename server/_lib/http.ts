@@ -56,6 +56,15 @@ export function setupBaseUrl(): string {
   return url.origin
 }
 
+export function plaidRedirectUri(): string {
+  const url = new URL(setupBaseUrl())
+  // The public apex domain redirects to www. Plaid must return directly to
+  // the same origin that receives the Link OAuth callback.
+  if (url.hostname === 'spendingtrkr.com') url.hostname = 'www.spendingtrkr.com'
+  url.pathname = '/import'
+  return url.toString()
+}
+
 export function publicError(error: unknown): string {
   if (error instanceof Error) return error.message
   return 'Unexpected setup error'

@@ -4,10 +4,12 @@ import { sessionByOAuthState, sessionFromRequest, updateSession } from '../../..
 import type { ApiRequest, ApiResponse } from '../../../_lib/types.js'
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
+  let plaidSetup = false
   try {
     const code = queryValue(request.query.code)
     const state = queryValue(request.query.state)
     const session = state ? await sessionByOAuthState('supabase', state) : null
+    plaidSetup = session?.status === 'plaid_connecting'
     if (!code || !session?.supabase_pkce_verifier_encrypted) throw new Error('Supabase authorization could not be verified')
     const cookieSession = await sessionFromRequest(request)
     if (cookieSession?.id !== session.id) throw new Error('Supabase authorization session expired')
@@ -29,7 +31,6 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     })
     const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; error_description?: string }
     if (!tokens.access_token) throw new Error(tokens.error_description || 'Supabase did not return an access token')
-    const plaidSetup = session.status === 'plaid_connecting'
     await updateSession(session.id, {
       supabase_connected_at: new Date().toISOString(),
       supabase_token_encrypted: encryptSecret(tokens.access_token),
@@ -41,6 +42,6 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     })
     response.redirect(302, plaidSetup ? '/account?plaid=connected' : '/setup?connected=supabase')
   } catch (error) {
-    response.redirect(302, `/setup?error=${encodeURIComponent(publicError(error))}`)
+    response.redirect(302, `${plaidSetup ? '/account?plaid=1&error=' : '/setup?error='}${encodeURIComponent(publicError(error))}`)
   }
 }

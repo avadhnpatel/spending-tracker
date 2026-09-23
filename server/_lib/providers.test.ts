@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { assertRecoverableSpendProject, providerErrorMessage, spendOwnerConfigurationSql, vercelProjectNameCandidates } from './providers'
+import { assertRecoverableSpendProject, providerErrorMessage, setPlaidSecrets, spendOwnerConfigurationSql, vercelProjectNameCandidates } from './providers'
 import type { SetupSession } from './types'
 
-afterEach(() => vi.unstubAllEnvs())
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+})
 
 describe('providerErrorMessage', () => {
   it('extracts messages from nested provider errors', () => {
@@ -46,5 +49,18 @@ describe('private project recovery', () => {
     vi.stubEnv('SETUP_SUPABASE_URL', 'https://bezcwdmaipsqzqgvlfjs.supabase.co')
     await expect(assertRecoverableSpendProject({} as SetupSession, 'bezcwdmaipsqzqgvlfjs'))
       .rejects.toThrow('provisioning project cannot be used')
+  })
+})
+
+describe('Plaid setup check', () => {
+  it('checks the actual OAuth redirect URI before saving credentials', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error_message: 'Redirect URI is not allowed' }), { status: 400 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(setPlaidSecrets({ directory_user_id: 'owner', supabase_project_ref: 'project' } as SetupSession, {
+      clientId: 'client', secret: 'secret', environment: 'sandbox', redirectUri: 'https://www.spendingtrkr.com/import',
+    })).rejects.toThrow('Redirect URI is not allowed')
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://sandbox.plaid.com/link/token/create')
+    expect(JSON.parse(fetchMock.mock.calls[0]?.[1].body as string)).toMatchObject({ redirect_uri: 'https://www.spendingtrkr.com/import' })
   })
 })

@@ -135,14 +135,10 @@ export async function getSupabasePublishableKey(session: SetupSession): Promise<
   return key
 }
 
-type PlaidEnvironment = 'sandbox' | 'development' | 'production'
+type PlaidEnvironment = 'sandbox' | 'production'
 
 function plaidBaseUrl(environment: PlaidEnvironment): string {
-  return environment === 'sandbox'
-    ? 'https://sandbox.plaid.com'
-    : environment === 'development'
-      ? 'https://development.plaid.com'
-      : 'https://production.plaid.com'
+  return environment === 'sandbox' ? 'https://sandbox.plaid.com' : 'https://production.plaid.com'
 }
 
 /**
@@ -162,6 +158,7 @@ export async function setPlaidSecrets(session: SetupSession, input: { clientId: 
       country_codes: ['US'],
       language: 'en',
       user: { client_user_id: session.directory_user_id },
+      redirect_uri: input.redirectUri,
     }),
   })
   if (!check.ok) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { setSessionCookie, setupBaseUrl } from './http'
+import { plaidRedirectUri, setSessionCookie, setupBaseUrl } from './http'
 import type { ApiResponse } from './types'
 
 const originalSetupBaseUrl = process.env.SETUP_BASE_URL
@@ -25,5 +25,10 @@ describe('setupBaseUrl', () => {
     const setHeader = vi.fn()
     setSessionCookie({ setHeader } as unknown as ApiResponse, 'session.secret')
     expect(setHeader).toHaveBeenCalledWith('Set-Cookie', expect.stringContaining('Domain=spendingtrkr.com'))
+  })
+
+  it('uses the canonical host for Plaid OAuth returns', () => {
+    process.env.SETUP_BASE_URL = 'https://spendingtrkr.com'
+    expect(plaidRedirectUri()).toBe('https://www.spendingtrkr.com/import')
   })
 })
