@@ -19,6 +19,7 @@ export function AccountPage() {
   const [plaidClientId, setPlaidClientId] = useState('')
   const [plaidSecret, setPlaidSecret] = useState('')
   const [plaidEnvironment, setPlaidEnvironment] = useState<'sandbox' | 'production'>('production')
+  const [plaidEnabled, setPlaidEnabled] = useState(false)
   const appOpened = useRef(false)
 
   useEffect(() => {
@@ -129,7 +130,8 @@ export function AccountPage() {
         body: JSON.stringify({ clientId: plaidClientId, secret: plaidSecret, environment: plaidEnvironment }),
       })
       setPlaidClientId(''); setPlaidSecret('')
-      setMessage('Plaid is enabled for your private tracker. You can now connect a bank.')
+      setPlaidEnabled(true)
+      setMessage('')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not save Plaid setup')
     } finally {
@@ -150,10 +152,17 @@ export function AccountPage() {
       {message ? <p className="mt-3 text-sm text-teal-800">{message}</p> : null}
     </GatewayShell>
   )
+  if (app && plaidSetup && plaidEnabled) return (
+    <GatewayShell>
+      <p className="mt-3 text-stone-600">Bank sync is ready. You can now connect an account from Import.</p>
+      <a href="/import" className="mt-6 flex min-h-12 items-center justify-center rounded-2xl bg-teal-800 px-5 font-semibold text-white">Connect a bank</a>
+      <a href="/" className="mt-3 flex min-h-12 items-center justify-center rounded-2xl border border-stone-300 px-5 font-semibold text-stone-200">Go home</a>
+    </GatewayShell>
+  )
   if (app && plaidSetup) return (
     <GatewayShell>
       <p className="mt-3 text-stone-600">Enable bank sync with your own Plaid account.</p>
-      <p className="mt-2 text-sm leading-6 text-stone-500">Your credentials are checked once, then written directly to your private Supabase Edge Function secrets. Spend never stores them. In your Plaid Dashboard, add <span className="font-medium text-stone-700">https://www.spendingtrkr.com/import</span> as an allowed redirect URI.</p>
+      <p className="mt-2 text-sm leading-6 text-stone-500">In your <a href="https://dashboard.plaid.com" target="_blank" rel="noreferrer" className="font-medium text-teal-700 underline">Plaid Dashboard</a>, enable Transactions, add <span className="font-medium text-stone-700">https://www.spendingtrkr.com/import</span> as an allowed redirect URI, and copy your Client ID and matching secret. Spend checks them and saves them in your private Supabase project.</p>
       <form onSubmit={savePlaidSetup} className="mt-6 space-y-3">
         <label className="block text-sm font-medium text-stone-700">Plaid environment<select value={plaidEnvironment} onChange={(event) => setPlaidEnvironment(event.target.value as typeof plaidEnvironment)} className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700"><option value="production">Production</option><option value="sandbox">Sandbox</option></select></label>
         <label className="block text-sm font-medium text-stone-700">Client ID<input required autoCapitalize="none" autoComplete="off" value={plaidClientId} onChange={(event) => setPlaidClientId(event.target.value)} className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-4 py-3.5 outline-none focus:border-teal-700" /></label>

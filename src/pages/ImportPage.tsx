@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTrackers } from '../context/TrackerContext'
 import { parseCsvStatement, type CsvParseResult } from '../lib/csv'
@@ -26,6 +27,7 @@ function localDateString(date = new Date()): string {
 }
 
 export function ImportPage() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { collections, trackers, activeCollection, active, createTracker } = useTrackers()
   const [candidates, setCandidates] = useState<ImportCandidate[]>([])
@@ -198,6 +200,10 @@ export function ImportPage() {
       setNotice(`Bank connected. ${staged} new transactions are ready to review.`)
       await refresh()
     } catch (err) {
+      if (err instanceof Error && err.message === 'Plaid is not configured') {
+        navigate('/account?plaid=1')
+        return
+      }
       setError(err instanceof Error ? err.message : 'Could not connect bank')
     } finally {
       setBusy(false)
