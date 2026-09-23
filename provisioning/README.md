@@ -20,6 +20,7 @@ In the control-plane project's Authentication settings:
 
 - Enable email authentication.
 - Add `https://spendingtrkr.com/account/callback` as a redirect URL.
+- For the iOS app, also add `spend://account/callback` as a redirect URL.
 - Optionally schedule `select public.delete_expired_provisioning_sessions();` daily.
 
 ## Supabase OAuth application
@@ -62,8 +63,16 @@ removed after this version is live.
 
 After directory authentication, `/api/directory/me` returns only the user's Supabase
 project reference and publishable key. The browser stores that public configuration
-locally and reloads the shared shell against the user's project. Supabase row-level
-security remains the data boundary.
+locally and reloads the shared shell against the user's project. On the public site,
+the cached configuration is revalidated against the signed-in directory account on
+every launch; a missing mapping or signed-out account clears it. Only `private_apps`
+is authoritative: old completed setup sessions cannot recreate a removed mapping.
+Supabase row-level security remains the data boundary.
+
+Recovery offers an explicit project choice, excludes the provisioning project, and
+requires an existing `spend_owner` record matching the verified directory email
+before changing that project's schema. A fresh account with no private project
+should use “Set up a new private database,” not recovery.
 
 Provisioning runs one external mutation per request. Each step has an optimistic lease,
 so duplicate browser requests cannot run the same step concurrently. A stopped request

@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest'
-import { providerErrorMessage, spendOwnerConfigurationSql, vercelProjectNameCandidates } from './providers'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { assertRecoverableSpendProject, providerErrorMessage, spendOwnerConfigurationSql, vercelProjectNameCandidates } from './providers'
+import type { SetupSession } from './types'
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe('providerErrorMessage', () => {
   it('extracts messages from nested provider errors', () => {
@@ -35,5 +38,13 @@ describe('spendOwnerConfigurationSql', () => {
 
   it('requires an owner before a private schema can be installed', () => {
     expect(() => spendOwnerConfigurationSql(null)).toThrow('owner email is missing')
+  })
+})
+
+describe('private project recovery', () => {
+  it('rejects the provisioning project before any management API request', async () => {
+    vi.stubEnv('SETUP_SUPABASE_URL', 'https://bezcwdmaipsqzqgvlfjs.supabase.co')
+    await expect(assertRecoverableSpendProject({} as SetupSession, 'bezcwdmaipsqzqgvlfjs'))
+      .rejects.toThrow('provisioning project cannot be used')
   })
 })

@@ -22,3 +22,18 @@ export function resumableSupabaseProjectName(requestedName: string, sessionId: s
   const suffix = sessionId.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)
   return suffix ? `${base}-${suffix}` : base
 }
+
+export function controlPlaneProjectRef(url: string | undefined): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    const match = parsed.hostname.match(/^([a-z0-9]{20})\.supabase\.co$/)
+    return parsed.protocol === 'https:' ? match?.[1] ?? null : null
+  } catch {
+    return null
+  }
+}
+
+export function isControlPlaneProject(ref: string, url: string | undefined = process.env.SETUP_SUPABASE_URL): boolean {
+  return ref === controlPlaneProjectRef(url)
+}

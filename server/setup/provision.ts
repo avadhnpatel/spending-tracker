@@ -1,7 +1,7 @@
 import { allowMethods, publicError, setupBaseUrl } from '../_lib/http.js'
-import { applySpendSchema, configureSupabaseAuth, createSupabaseProject, deploySpendFunction, getSupabasePublishableKey, listSupabaseProjects } from '../_lib/providers.js'
+import { applySpendSchema, assertRecoverableSpendProject, configureSupabaseAuth, createSupabaseProject, deploySpendFunction, getSupabasePublishableKey, listSupabaseProjects } from '../_lib/providers.js'
 import { claimProvisioningStep, finishProvisioningStep, publicSession, savePrivateApp, sessionFromRequest } from '../_lib/store.js'
-import { parseSupabaseRegionGroup, resumableSupabaseProjectName } from '../_lib/supabase-project.js'
+import { isControlPlaneProject, parseSupabaseRegionGroup, resumableSupabaseProjectName } from '../_lib/supabase-project.js'
 import type { ApiRequest, ApiResponse, SetupSession } from '../_lib/types.js'
 
 type Input = { organizationSlug?: string; projectName?: string; regionGroup?: string; existingProjectRef?: string }
@@ -38,6 +38,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       }
       const project = (await listSupabaseProjects(claim.session)).find((candidate) => candidate.ref === projectRef)
       if (!project) throw new Error('That Supabase project is not available to this account')
+      await assertRecoverableSpendProject(claim.session, project.ref)
       session = await finishProvisioningStep(claim, { supabase_project_ref: project.ref, status: 'applying_schema' })
     } else if (step === 'ready_to_provision') {
       const organizationSlug = input.organizationSlug?.trim()
@@ -47,6 +48,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
         return response.status(400).json({ error: 'Choose a Supabase organization', session: publicSession(session) })
       }
       const project = await createSupabaseProject(claim.session, organizationSlug, projectName, parseSupabaseRegionGroup(input.regionGroup))
+      if (isControlPlaneProject(project.ref)) throw new Error('The Spend provisioning project cannot be used as a private database')
       session = await finishProvisioningStep(claim, { supabase_project_ref: project.ref, status: 'applying_schema' })
     } else if (step === 'applying_schema') {
       await applySpendSchema(claim.session)

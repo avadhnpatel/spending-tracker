@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { decryptSecret } from './crypto.js'
-import { supabaseProjectBody, type SupabaseRegionGroup } from './supabase-project.js'
+import { isControlPlaneProject, supabaseProjectBody, type SupabaseRegionGroup } from './supabase-project.js'
 import type { SetupSession } from './types.js'
 
 type ProviderError = { message?: unknown; error?: unknown; error_description?: unknown; details?: unknown; hint?: unknown }
@@ -71,6 +71,22 @@ export async function listSupabaseProjects(session: SetupSession): Promise<Supab
   })
 }
 
+export async function assertRecoverableSpendProject(session: SetupSession, projectRef: string): Promise<void> {
+  if (isControlPlaneProject(projectRef)) throw new Error('The Spend provisioning project cannot be used as a private database')
+  const endpoint = `https://api.supabase.com/v1/projects/${projectRef}/database/query`
+  const headers = { Authorization: `Bearer ${supabaseToken(session)}`, 'Content-Type': 'application/json' }
+  const tables = await providerRequest<Array<{ owner_table: string | null }>>(endpoint, {
+    method: 'POST', headers, body: JSON.stringify({ query: "select to_regclass('public.spend_owner') as owner_table", read_only: true }),
+  })
+  if (!tables[0]?.owner_table) throw new Error('That project is not an existing private Spend database')
+  const owners = await providerRequest<Array<{ email: string }>>(endpoint, {
+    method: 'POST', headers, body: JSON.stringify({ query: 'select email from public.spend_owner where singleton = true', read_only: true }),
+  })
+  if (!session.directory_email || owners[0]?.email !== session.directory_email.trim().toLowerCase()) {
+    throw new Error('That private Spend database belongs to a different email')
+  }
+}
+
 export async function createSupabaseProject(session: SetupSession, organizationSlug: string, name: string, regionGroup: SupabaseRegionGroup) {
   const projects = await listSupabaseProjects(session)
   const existing = projects.find((project) => project.name === name)
@@ -98,6 +114,7 @@ export function spendOwnerConfigurationSql(email: string | null): string {
 
 export async function applySpendSchema(session: SetupSession): Promise<void> {
   if (!session.supabase_project_ref) throw new Error('Supabase project is missing')
+  if (isControlPlaneProject(session.supabase_project_ref)) throw new Error('The Spend provisioning project cannot be used as a private database')
   const schema = await readFile(join(process.cwd(), 'supabase/schema.sql'), 'utf8')
   const query = `${schema}\n${spendOwnerConfigurationSql(session.directory_email)}`
   await providerRequest(`https://api.supabase.com/v1/projects/${session.supabase_project_ref}/database/query`, {

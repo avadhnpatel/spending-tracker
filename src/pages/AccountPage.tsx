@@ -1,18 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { directoryCallbackUrl, directorySession, directorySupabase } from '../lib/directory'
+import { directoryCallbackUrl, directoryRequest, directorySession, directorySupabase, type DirectoryPrivateApp } from '../lib/directory'
 import { startPrivateSetup } from '../lib/mobile-onboarding'
-import { isNativePlatform } from '../lib/platform'
-import { saveRuntimeSupabaseConfig } from '../lib/runtime-config'
-
-type PrivateApp = { deployment_url: string; supabase_project_ref: string; supabase_publishable_key: string }
-
-async function directoryRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { ...init, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(init?.headers ?? {}) } })
-  const body = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(body.error || 'Account request failed')
-  return body
-}
+import { isNativePlatform, provisioningBaseUrl } from '../lib/platform'
+import { runtimeConfigForPrivateApp, saveRuntimeSupabaseConfig } from '../lib/runtime-config'
 
 export function AccountPage() {
   const navigate = useNavigate()
@@ -22,7 +13,7 @@ export function AccountPage() {
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
-  const [app, setApp] = useState<PrivateApp | null>(null)
+  const [app, setApp] = useState<DirectoryPrivateApp | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
   const [directoryAccessToken, setDirectoryAccessToken] = useState<string | null>(null)
   const [plaidClientId, setPlaidClientId] = useState('')
@@ -37,7 +28,7 @@ export function AccountPage() {
       setEmail(session.user.email ?? '')
       setDirectoryAccessToken(session.access_token)
       try {
-        const result = await directoryRequest<{ app: PrivateApp | null }>('/api/directory/me', session.access_token)
+        const result = await directoryRequest<{ app: DirectoryPrivateApp | null }>('/api/directory/me', session.access_token)
         setApp(result.app)
       } catch (error) {
         setMessage(error instanceof Error ? error.message : 'Could not find your private app')
@@ -51,11 +42,7 @@ export function AccountPage() {
   useEffect(() => {
     if (!app || recoveryRequested || plaidRequested || appOpened.current) return
     appOpened.current = true
-    void saveRuntimeSupabaseConfig({
-      url: `https://${app.supabase_project_ref}.supabase.co`,
-      publishableKey: app.supabase_publishable_key,
-      deploymentUrl: app.deployment_url,
-    }).then(() => window.location.replace('/login')).catch((error: unknown) => {
+    void saveRuntimeSupabaseConfig(runtimeConfigForPrivateApp(app)).then(() => window.location.replace('/login')).catch((error: unknown) => {
       appOpened.current = false
       setMessage(error instanceof Error ? error.message : 'Could not open your private tracker')
     })
@@ -96,6 +83,10 @@ export function AccountPage() {
     setBusy(true)
     setMessage('Preparing recovery…')
     try {
+      if (isNativePlatform()) {
+        await startPrivateSetup(directoryAccessToken, true)
+        return
+      }
       await directoryRequest('/api/directory/recover', directoryAccessToken, { method: 'POST' })
       navigate('/setup')
     } catch (error) {
@@ -122,7 +113,7 @@ export function AccountPage() {
     setBusy(true); setMessage('Connecting to Supabase…')
     try {
       await directoryRequest('/api/directory/plaid', directoryAccessToken, { method: 'POST' })
-      window.location.assign('/api/setup/oauth/supabase/start')
+      window.location.assign(`${isNativePlatform() ? provisioningBaseUrl() : ''}/api/setup/oauth/supabase/start`)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not start Plaid setup')
       setBusy(false)
@@ -183,7 +174,7 @@ export function AccountPage() {
     </GatewayShell>
   )
   if (app && recoveryRequested) return <GatewayShell><p className="mt-3 text-stone-600">Reconnect {email || 'this account'} to the Supabase project that contains your existing Spend data.</p><p className="mt-2 text-sm leading-6 text-stone-500">Choose an existing project to recover it, or intentionally replace the current link with a new private database.</p><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Choose an existing Supabase project</button><button type="button" onClick={() => void startSetupManually(true)} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Create a new private database</button><button type="button" onClick={() => window.location.replace('/account')} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Keep using the current project</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
-  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">If you already own a Spend project, recover it without creating anything. Otherwise, create a new private database.</p><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Recover my existing database</button><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
+  if (!app) return <GatewayShell><p className="mt-3 text-stone-600">No private database is linked to {email || 'this email'}.</p><p className="mt-2 text-sm leading-6 text-stone-500">Create a new private Supabase project for a clean start. If you already own a Spend project with data you want to keep, you can recover it instead.</p><button type="button" onClick={() => void startSetupManually()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl bg-teal-800 px-5 font-semibold text-white disabled:opacity-60">Set up a new private database</button><button type="button" onClick={() => void recoverExistingProject()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Recover my existing database</button><button type="button" onClick={() => void changeDirectoryEmail()} disabled={busy} className="mt-3 min-h-12 w-full rounded-2xl border border-stone-300 px-5 font-semibold text-stone-700 disabled:opacity-60">Use a different email</button>{message ? <p className="mt-5 text-sm text-teal-800">{message}</p> : null}</GatewayShell>
   return <GatewayShell><p className="mt-3 text-stone-600">Opening your private tracker…</p><button type="button" onClick={() => void beginPlaidSetup()} disabled={busy} className="mt-6 min-h-12 w-full rounded-2xl border border-teal-800 px-5 font-semibold text-teal-900 disabled:opacity-60">Enable Plaid bank sync</button>{message ? <p className="mt-5 text-sm text-red-700">{message}</p> : null}</GatewayShell>
 }
 

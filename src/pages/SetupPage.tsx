@@ -67,7 +67,7 @@ export function SetupPage() {
         setOrganizations(result.organizations)
         setProjects(result.projects)
         setOrganizationSlug((current) => current || result.organizations[0]?.slug || '')
-        setExistingProjectRef((current) => current || result.projects.find((project) => project.name.startsWith('spend-private'))?.ref || result.projects[0]?.ref || '')
+        setExistingProjectRef((current) => result.projects.some((project) => project.ref === current) ? current : '')
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not load Supabase organizations')
       }
@@ -136,8 +136,10 @@ export function SetupPage() {
               <div className="mt-4 space-y-3">
                 {recovering ? <label className="block text-sm font-semibold text-teal-950">Existing Supabase project
                   <select value={existingProjectRef} onChange={(event) => setExistingProjectRef(event.target.value)} disabled={busy} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">
+                    <option value="">Choose a private Spend project…</option>
                     {projects.map((project) => <option key={project.ref} value={project.ref}>{project.name}</option>)}
                   </select>
+                  {projects.length === 0 ? <span className="mt-2 block font-normal text-teal-900">No existing private Spend project was found. Go back and choose “Set up a new private database.”</span> : null}
                 </label> : <>
                 <label className="block text-sm font-semibold text-teal-950">Supabase organization
                   <select value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value)} disabled={busy || Boolean(session.supabaseProjectRef)} className="mt-1 min-h-12 w-full rounded-xl border border-teal-200 bg-white px-3 text-stone-900 disabled:opacity-60">

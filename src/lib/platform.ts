@@ -6,7 +6,7 @@ export function provisioningBaseUrl(): string {
   return (
     import.meta.env.VITE_PROVISIONING_URL ||
     import.meta.env.VITE_APP_URL ||
-    (isNativePlatform() ? 'https://spending-tracker-bice-omega.vercel.app' : window.location.origin)
+    (isNativePlatform() ? 'https://spendingtrkr.com' : window.location.origin)
   ).replace(/\/$/, '')
 }
 

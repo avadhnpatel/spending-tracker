@@ -11,7 +11,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
   try {
     const owner = await directoryUserFromRequest(request)
-    const { session, browserToken, claimCode } = await createMobileSession(owner)
+    const recover = (request.body as { recover?: unknown } | undefined)?.recover === true
+    const { session, browserToken, claimCode } = await createMobileSession(owner, recover)
     const url = new URL('/api/setup/mobile/activate', setupBaseUrl())
     url.searchParams.set('token', browserToken)
     response.status(201).json({

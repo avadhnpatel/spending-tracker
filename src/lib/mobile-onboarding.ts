@@ -3,6 +3,7 @@ import { Browser } from '@capacitor/browser'
 import { Preferences } from '@capacitor/preferences'
 import { isNativePlatform, provisioningBaseUrl } from './platform'
 import { saveRuntimeSupabaseConfig } from './runtime-config'
+import { provisioningJson } from './provisioning-request'
 
 type MobileSetupStart = { sessionId: string; claimCode: string; setupUrl: string; expiresAt: string }
 type MobileSetupClaim = { supabaseUrl: string; publishableKey: string; deploymentUrl?: string }
@@ -29,22 +30,17 @@ async function setPending(value: MobileSetupStart | null) {
   else window.localStorage.removeItem(PENDING_KEY)
 }
 
-async function readJson<T>(response: Response): Promise<T> {
-  const data = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(data.error || 'Private setup could not continue')
-  return data
-}
-
 async function finishFromUrl(url: string): Promise<boolean> {
   const parsed = new URL(url)
   if (parsed.protocol !== 'spend:' || parsed.hostname !== 'setup' || parsed.pathname !== '/complete') return false
   const sessionId = parsed.searchParams.get('session')
   const pending = await getPending()
   if (!sessionId || !pending || pending.sessionId !== sessionId) return false
-  const response = await fetch(`${provisioningBaseUrl()}/api/setup/mobile/claim`, {
+  const response = await provisioningJson<MobileSetupClaim>(`${provisioningBaseUrl()}/api/setup/mobile/claim`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, claimCode: pending.claimCode }),
   })
-  const config = await readJson<MobileSetupClaim>(response)
+  if (response.status < 200 || response.status >= 300) throw new Error(response.body.error || 'Private setup could not continue')
+  const config = response.body
   await saveRuntimeSupabaseConfig({ url: config.supabaseUrl, publishableKey: config.publishableKey, deploymentUrl: config.deploymentUrl })
   await setPending(null)
   await Browser.close()
@@ -52,10 +48,14 @@ async function finishFromUrl(url: string): Promise<boolean> {
   return true
 }
 
-export async function startPrivateSetup(directoryAccessToken?: string): Promise<void> {
+export async function startPrivateSetup(directoryAccessToken: string, recover = false): Promise<void> {
   if (!isNativePlatform()) { window.location.assign('/setup'); return }
-  const response = await fetch(`${provisioningBaseUrl()}/api/setup/mobile/start`, { method: 'POST', headers: directoryAccessToken ? { Authorization: `Bearer ${directoryAccessToken}` } : {} })
-  const setup = await readJson<MobileSetupStart>(response)
+  if (!directoryAccessToken) throw new Error('Sign in to your Spend account before starting setup')
+  const response = await provisioningJson<MobileSetupStart>(`${provisioningBaseUrl()}/api/setup/mobile/start`, {
+    method: 'POST', headers: { Authorization: `Bearer ${directoryAccessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ recover }),
+  })
+  if (response.status < 200 || response.status >= 300) throw new Error(response.body.error || 'Private setup could not continue')
+  const setup = response.body
   await setPending(setup)
   await Browser.open({ url: setup.setupUrl, presentationStyle: 'fullscreen' })
 }
@@ -63,6 +63,10 @@ export async function startPrivateSetup(directoryAccessToken?: string): Promise<
 async function handleNativeUrl(url: string): Promise<boolean> {
   if (await finishFromUrl(url)) return true
   const parsed = new URL(url)
+  if (parsed.protocol === 'spend:' && parsed.hostname === 'account' && parsed.pathname === '/callback') {
+    window.location.replace(`/account/callback${parsed.search}${parsed.hash}`)
+    return true
+  }
   if (parsed.protocol === 'spend:' && parsed.hostname === 'auth' && parsed.pathname === '/callback') {
     window.location.replace(`/auth/callback${parsed.search}${parsed.hash}`)
     return true
