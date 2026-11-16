@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useTrackers } from '../context/TrackerContext'
 import { parseCsvStatement, type CsvParseResult } from '../lib/csv'
-import { filterCandidatesByDate, filterCardCandidates, listActiveTrackers, suggestCardCategory } from '../lib/card-activity'
+import { filterCandidatesByDate, filterCandidatesByStatus, filterCardCandidates, listActiveTrackers, suggestCardCategory, type CardStatusFilter } from '../lib/card-activity'
 import { formatDate, formatMoney } from '../lib/format'
 import { connectPlaid, resumePlaidRedirect, syncPlaid } from '../lib/plaid'
 import {
@@ -47,6 +47,7 @@ export function ImportPage() {
   const [cardSearch, setCardSearch] = useState('')
   const [cardFilter, setCardFilter] = useState('all')
   const [cardDateFilter, setCardDateFilter] = useState<CardDateFilter>('all')
+  const [cardStatusFilter, setCardStatusFilter] = useState<CardStatusFilter>('all')
   const [cardDate, setCardDate] = useState(localDateString())
   const [cardStartDate, setCardStartDate] = useState('')
   const [cardEndDate, setCardEndDate] = useState(localDateString())
@@ -69,7 +70,8 @@ export function ImportPage() {
         ? { start: localDateString(thirtyDaysAgo), end: localDateString() }
         : { start: '', end: '' }
   const cardAndSearchMatches = filterCardCandidates(plaidCandidates, cardSearch, cardFilter)
-  const visibleCardCandidates = filterCandidatesByDate(cardAndSearchMatches, cardDateBounds.start, cardDateBounds.end)
+  const datedCardCandidates = filterCandidatesByDate(cardAndSearchMatches, cardDateBounds.start, cardDateBounds.end)
+  const visibleCardCandidates = filterCandidatesByStatus(datedCardCandidates, cardStatusFilter)
   const choosingCard = plaidCandidates.find((candidate) => candidate.id === choosingCardId) ?? null
   const cardTracker = activeTrackers.find((tracker) => tracker.id === cardTrackerId) ?? null
   const cardCategories = categories.filter((category) => category.collection_id === cardTracker?.collection_id && category.kind === choosingCard?.kind)
@@ -433,6 +435,17 @@ export function ImportPage() {
                   </label>
                 </div>
               ) : null}
+            </div>
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+              {([
+                ['all', 'All statuses'],
+                ['authorized', 'Authorized'],
+                ['pending', 'Pending'],
+              ] as const).map(([value, label]) => (
+                <button key={value} type="button" onClick={() => setCardStatusFilter(value)} className={`min-h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition ${cardStatusFilter === value ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600'}`}>
+                  {label}
+                </button>
+              ))}
             </div>
             {plaidCandidates.length > 6 ? (
               <input value={cardSearch} onChange={(event) => setCardSearch(event.target.value)} placeholder="Search card activity" className="mt-4 min-h-11 w-full rounded-xl bg-stone-50 px-3 outline-none" />

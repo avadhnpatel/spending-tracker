@@ -19,6 +19,14 @@ export function filterCandidatesByDate(candidates: ImportCandidate[], startDate 
   ))
 }
 
+export type CardStatusFilter = 'all' | 'authorized' | 'pending'
+
+export function filterCandidatesByStatus(candidates: ImportCandidate[], status: CardStatusFilter = 'all'): ImportCandidate[] {
+  return candidates.filter((candidate) => (
+    status === 'all' || (status === 'pending' ? candidate.pending : !candidate.pending)
+  ))
+}
+
 export function suggestCardCategory(candidate: ImportCandidate, tracker: Tracker, categories: Category[]): Category | null {
   const hint = candidate.category_hint.toLowerCase().replaceAll('_', ' ')
   if (!hint) return null
